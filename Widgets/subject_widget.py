@@ -1,5 +1,15 @@
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
+# -*- coding: utf-8 -*-
+"""
+Widgets/subject_widget.py
+--------------------------
+One subject panel: title, session-type combo, per-subject timer, notes area.
+
+When frozen by MainWindow, the widget becomes read-only. Clicking or tabbing
+into any child control emits  focused()  so MainWindow can unfreeze it.
+"""
+
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QFont, QFocusEvent
 from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
@@ -12,31 +22,53 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+
+class _FocusLineEdit(QLineEdit):
+    """QLineEdit that forwards focusInEvent to a callback."""
+    def __init__(self, on_focus, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._on_focus = on_focus
+
+    def focusInEvent(self, event: QFocusEvent) -> None:
+        super().focusInEvent(event)
+        self._on_focus()
+
+
+class _FocusTextEdit(QTextEdit):
+    """QTextEdit that forwards focusInEvent to a callback."""
+    def __init__(self, on_focus, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._on_focus = on_focus
+
+    def focusInEvent(self, event: QFocusEvent) -> None:
+        super().focusInEvent(event)
+        self._on_focus()
+
+
+class _FocusComboBox(QComboBox):
+    """QComboBox that forwards focusInEvent to a callback."""
+    def __init__(self, on_focus, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._on_focus = on_focus
+
+    def focusInEvent(self, event: QFocusEvent) -> None:
+        super().focusInEvent(event)
+        self._on_focus()
+
+
 class SubjectWidget(QWidget):
-    """
-    One 'subject' panel: title, session-type combo, countdown/countup timer,
-    and a free-text notes area.
+    # Emitted when any child receives focus while the widget is frozen
+    focused = Signal()
 
-    State can be snapshot-ed to a dict and restored from one, which makes
-    JSON persistence straightforward.
-    """
-
-    # Default session-type choices – pass a list to __init__ to override.
     DEFAULT_SESSION_TYPES = [
-        "Lecture",
-        "Tutorial",
-        "Lab",
-        "Seminar",
-        "Self-Study",
-        "Revision",
-        "Other",
+        "Lecture", "Exercise", "Discussion", "Break", "Other",
     ]
 
     def __init__(self, session_types=None, parent=None):
         super().__init__(parent)
-
         self._elapsed_seconds: int = 0
         self._timer_running: bool = False
+        self._frozen: bool = False
 
         self._qt_timer = QTimer(self)
         self._qt_timer.setInterval(1000)
@@ -44,15 +76,17 @@ class SubjectWidget(QWidget):
 
         self._build_ui(session_types or self.DEFAULT_SESSION_TYPES)
 
-    # ------------------------------------------------------------------
-    # UI construction
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
+    # UI
+    # ──────────────────────────────────────────────────────────────────
 
-    def _build_ui(self, session_types: list[str]) -> None:
+    def _build_ui(self, session_types: list) -> None:
         root = QGridLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setHorizontalSpacing(0)
         root.setVerticalSpacing(2)
+
+        sp_max = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
 
         # ── Top bar ────────────────────────────────────────────────────
         top = QWidget(self)
@@ -60,10 +94,9 @@ class SubjectWidget(QWidget):
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setHorizontalSpacing(4)
         top_layout.setVerticalSpacing(0)
+        top.setSizePolicy(sp_max)
 
-        sp_max = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
-
-        # Title line-edit
+        # Title + session-type column
         title_container = QWidget(top)
         title_container.setSizePolicy(
             QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Maximum)
@@ -73,7 +106,7 @@ class SubjectWidget(QWidget):
         title_layout.setHorizontalSpacing(4)
         title_layout.setVerticalSpacing(0)
 
-        self.le_title = QLineEdit(title_container)
+        self.le_title = _FocusLineEdit(self._on_child_focused, title_container)
         font_title = QFont()
         font_title.setPointSize(16)
         font_title.setBold(True)
@@ -84,7 +117,6 @@ class SubjectWidget(QWidget):
         )
         title_layout.addWidget(self.le_title, 0, 0, 1, 1, Qt.AlignmentFlag.AlignBottom)
 
-        # Session-type combo
         session_container = QWidget(title_container)
         session_layout = QGridLayout(session_container)
         session_layout.setContentsMargins(0, 0, 0, 0)
@@ -93,7 +125,7 @@ class SubjectWidget(QWidget):
         self.lbl_session = QLabel("Session Type", session_container)
         session_layout.addWidget(self.lbl_session, 0, 0, 1, 1)
 
-        self.cb_session = QComboBox(session_container)
+        self.cb_session = _FocusComboBox(self._on_child_focused, session_container)
         self.cb_session.setMinimumWidth(125)
         font_cb = QFont()
         font_cb.setPointSize(9)
@@ -109,7 +141,7 @@ class SubjectWidget(QWidget):
         title_layout.addWidget(session_container, 0, 1, 1, 1)
         top_layout.addWidget(title_container, 0, 0, 1, 1)
 
-        # Timer section
+        # Timer column
         timer_container = QWidget(top)
         timer_container.setSizePolicy(sp_max)
         timer_layout = QGridLayout(timer_container)
@@ -131,7 +163,7 @@ class SubjectWidget(QWidget):
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(0)
 
-        self.btn_play = QPushButton("Play/Pause", btn_container)
+        self.btn_play = QPushButton("Play", btn_container)
         self.btn_play.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_play.clicked.connect(self.toggle_timer)
         btn_layout.addWidget(self.btn_play, 0, 0, 1, 1)
@@ -144,11 +176,10 @@ class SubjectWidget(QWidget):
         timer_layout.addWidget(btn_container, 0, 1, 1, 1)
         top_layout.addWidget(timer_container, 0, 1, 1, 1)
 
-        top.setSizePolicy(sp_max)
         root.addWidget(top, 0, 0, 1, 1)
 
         # ── Notes text-edit ────────────────────────────────────────────
-        self.te_content = QTextEdit(self)
+        self.te_content = _FocusTextEdit(self._on_child_focused, self)
         font_te = QFont()
         font_te.setPointSize(12)
         self.te_content.setFont(font_te)
@@ -160,17 +191,61 @@ class SubjectWidget(QWidget):
         )
         root.addWidget(self.te_content, 1, 0, 1, 1)
 
-    # ------------------------------------------------------------------
-    # Timer logic
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
+    # Focus-to-unfreeze
+    # ──────────────────────────────────────────────────────────────────
+
+    def _on_child_focused(self) -> None:
+        """Called whenever a child widget gains focus. Emit if frozen."""
+        if self._frozen:
+            self.focused.emit()
+
+    # ──────────────────────────────────────────────────────────────────
+    # Freeze / unfreeze  (called by MainWindow)
+    # ──────────────────────────────────────────────────────────────────
+
+    def freeze(self) -> None:
+        self._frozen = True
+        self.le_title.setReadOnly(True)
+        self.te_content.setReadOnly(True)
+        self.cb_session.setEnabled(False)
+        self.btn_play.setEnabled(False)
+        self.btn_reset.setEnabled(False)
+        self.setStyleSheet("""
+            SubjectWidget {
+                background: palette(window);
+                border: 1px solid palette(mid);
+            }
+            QLineEdit, QTextEdit {
+                background: palette(window);
+                color: palette(mid);
+            }
+        """)
+
+    def unfreeze(self) -> None:
+        self._frozen = False
+        self.le_title.setReadOnly(False)
+        self.te_content.setReadOnly(False)
+        self.cb_session.setEnabled(True)
+        self.btn_play.setEnabled(True)
+        self.btn_reset.setEnabled(True)
+        self.setStyleSheet("")
+
+    # ──────────────────────────────────────────────────────────────────
+    # Timer
+    # ──────────────────────────────────────────────────────────────────
 
     def toggle_timer(self) -> None:
         if self._timer_running:
             self._qt_timer.stop()
             self._timer_running = False
+            # Change the button text to "Play" when paused
+            self.btn_play.setText("Play")
         else:
             self._qt_timer.start()
             self._timer_running = True
+            # Change the button text to "Pause" when running
+            self.btn_play.setText("Pause")
 
     def reset_timer(self) -> None:
         self._qt_timer.stop()
@@ -188,29 +263,25 @@ class SubjectWidget(QWidget):
         s = self._elapsed_seconds % 60
         self.lcd.display(f"{h:02d}:{m:02d}:{s:02d}")
 
-    # ------------------------------------------------------------------
-    # Serialisation helpers
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
+    # Serialisation
+    # ──────────────────────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
-        """Snapshot the widget's current state as a plain dict."""
-        # Stop the timer before snapshotting so time doesn't drift
         was_running = self._timer_running
         if was_running:
             self._qt_timer.stop()
             self._timer_running = False
 
-        state = {
+        return {
             "title": self.le_title.text(),
             "session_type": self.cb_session.currentText(),
             "content": self.te_content.toPlainText(),
             "elapsed_seconds": self._elapsed_seconds,
             "timer_was_running": was_running,
         }
-        return state
 
     def from_dict(self, data: dict) -> None:
-        """Restore widget state from a previously serialised dict."""
         self.le_title.setText(data.get("title", ""))
 
         session = data.get("session_type", "")
@@ -228,9 +299,9 @@ class SubjectWidget(QWidget):
             self._qt_timer.start()
             self._timer_running = True
 
-    # ------------------------------------------------------------------
-    # Convenience properties
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
+    # Properties
+    # ──────────────────────────────────────────────────────────────────
 
     @property
     def title(self) -> str:
@@ -239,3 +310,5 @@ class SubjectWidget(QWidget):
     @property
     def elapsed_seconds(self) -> int:
         return self._elapsed_seconds
+
+
