@@ -32,8 +32,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QStackedWidget,
-    QVBoxLayout,
-    QWidget,
 )
 
 from Pages.UI.ui_Main_Window import Ui_Main_Window
