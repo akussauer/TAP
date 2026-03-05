@@ -1,19 +1,21 @@
 import re
 import enchant
+
+from PySide6.QtWidgets import QMessageBox
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 
-
 class MarkdownHighlighter(QSyntaxHighlighter):
-    def __init__(self, document):
+    def __init__(self, document, parent=None, language="en_GB"):
         super().__init__(document)
+        self.parent = parent
         self.rules = []
 
         # Spell checker
         try:
-            self.spell = enchant.Dict("en_GB") # Use British English dictionary
+            self.spell = enchant.Dict(language) # Use the specified language dictionary
         except enchant.errors.DictNotFoundError:
             self.spell = None
-            print("Spell check dictionary not found, spell check disabled.")
+            QMessageBox.Warning(self.parent, "Spell Check Warning", f"No dictionary found for language '{language}'. Spell checking will be disabled.")
 
         # Spell check format — red underline
         self.spell_error_fmt = QTextCharFormat()
@@ -28,6 +30,9 @@ class MarkdownHighlighter(QSyntaxHighlighter):
 
         # --- Italic (*text*) — light grey
         self._add_rule(r'\*.+?\*', "#BBBBBB", italic=True)
+
+        # --- Strikethrough (~~text~~) — muted red
+        self._add_rule(r'~~.+?~~', "#E06C6C")
 
         # --- Ordered list (1. 2. etc) — light blue
         self._add_rule(r'^\d+\.', "#6FC3E0")

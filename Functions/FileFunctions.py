@@ -1,5 +1,6 @@
 import json
 import os
+import pandas as pd
 
 from PySide6.QtWidgets import QMessageBox
 
@@ -51,14 +52,17 @@ class FunctionsFile:
                     if sub_dir == "Session Data":
                         self.session_data_path = dir_path
             
-            # Establish JSON settings files
-            settings_path = os.path.join(self.app_data_path, "settings.json")
-            if not os.path.exists(settings_path):
-                with open(settings_path, "w") as f:
+            # Establish JSON config file
+            config_path = os.path.join(self.app_data_path, "config.json")
+            if not os.path.exists(config_path):
+                with open(config_path, "w") as f:
                     json.dump({
                         "theme": "system",
-                        "file_location": "default"
+                        "style": "default",
+                        "file_location": "default",
+                        "Language": "en_GB"
                     }, f)
+                    
         except Exception as e:
             # if hasattr(self, "error_logger"):
                 # self.error_logger.error(f"Error initializing paths: {e}", exc_info=True)
@@ -86,3 +90,15 @@ class FunctionsFile:
                 # if hasattr(self, "info_logger"): # Log the creation of the new directory
                     # self.info_logger.info(f"Created new directory: {full_path}", exc_info=False)
         return full_path
+    
+    def get_configs(self):
+        config_path = os.path.join(self.app_data_path, "config.json")
+        if not os.path.exists(config_path):
+            with open(config_path, "w") as f:
+                json.dump({
+                    "theme": "system",
+                    "style": "default",
+                    "file_location": "default",
+                    "Language": "en_GB"
+                }, f)
+        return pd.read_json(config_path, orient="records", lines=True).iloc[0]

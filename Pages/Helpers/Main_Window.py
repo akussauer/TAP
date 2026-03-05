@@ -1,5 +1,5 @@
 from Pages.UI.ui_Main_Window import Ui_Main_Window
-from Functions.md_highlighter import MarkdownHighlighter
+from Widgets.md_highlighter import MarkdownHighlighter
 from Functions.FileFunctions import FunctionsFile
 
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QFileDialog
@@ -20,10 +20,12 @@ class MainWindow(QMainWindow):
         # Init Functions
         self.file_func = FunctionsFile(parent=self)
 
-        self.timer_running = False
-        self.timer_time = 0
+        # Setup the preferences file if it doesn't exist
+        self.configs = self.file_func.get_configs()
 
         # Qt timer that fires every 1000ms (1 second)
+        self.timer_running = False
+        self.timer_time = 0
         self.qt_timer = QTimer(self)
         self.qt_timer.setInterval(1000)
         self.qt_timer.timeout.connect(self.timer_tick)
@@ -51,7 +53,11 @@ class MainWindow(QMainWindow):
         self.ui.LCDDisplay_lesson.display(self.print_time(return_time=True))
 
         # Initialise the first markdown highlighter
-        self.highlighter = MarkdownHighlighter(self.ui.TEContent_0.document())
+        self.highlighter = MarkdownHighlighter(
+            self.ui.TEContent_0.document(),
+            parent=self,
+            language=self.configs['Language'].lower()
+            )
 
         # Connect the text changed signal for {}, [], and ()
         self.ui.TEContent_0.textChanged.connect(self.on_text_changed)
