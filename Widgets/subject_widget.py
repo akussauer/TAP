@@ -1,15 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Widgets/subject_widget.py
---------------------------
-One subject panel: title, session-type combo, per-subject timer, notes area.
-
-When frozen by MainWindow, the widget becomes read-only. Clicking or tabbing
-into any child control emits  focused()  so MainWindow can unfreeze it.
-"""
-
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QFont, QFocusEvent
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
@@ -23,42 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 
-class _FocusLineEdit(QLineEdit):
-    """QLineEdit that forwards focusInEvent to a callback."""
-    def __init__(self, on_focus, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._on_focus = on_focus
-
-    def focusInEvent(self, event: QFocusEvent) -> None:
-        super().focusInEvent(event)
-        self._on_focus()
-
-
-class _FocusTextEdit(QTextEdit):
-    """QTextEdit that forwards focusInEvent to a callback."""
-    def __init__(self, on_focus, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._on_focus = on_focus
-
-    def focusInEvent(self, event: QFocusEvent) -> None:
-        super().focusInEvent(event)
-        self._on_focus()
-
-
-class _FocusComboBox(QComboBox):
-    """QComboBox that forwards focusInEvent to a callback."""
-    def __init__(self, on_focus, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._on_focus = on_focus
-
-    def focusInEvent(self, event: QFocusEvent) -> None:
-        super().focusInEvent(event)
-        self._on_focus()
-
-
 class SubjectWidget(QWidget):
-    # Emitted when any child receives focus while the widget is frozen
-    focused = Signal()
 
     DEFAULT_SESSION_TYPES = [
         "Lecture", "Exercise", "Discussion", "Break", "Other",
@@ -68,7 +23,6 @@ class SubjectWidget(QWidget):
         super().__init__(parent)
         self._elapsed_seconds: int = 0
         self._timer_running: bool = False
-        self._frozen: bool = False
 
         self._qt_timer = QTimer(self)
         self._qt_timer.setInterval(1000)
@@ -106,7 +60,7 @@ class SubjectWidget(QWidget):
         title_layout.setHorizontalSpacing(4)
         title_layout.setVerticalSpacing(0)
 
-        self.le_title = _FocusLineEdit(self._on_child_focused, title_container)
+        self.le_title = QLineEdit(title_container)
         font_title = QFont()
         font_title.setPointSize(16)
         font_title.setBold(True)
@@ -125,7 +79,7 @@ class SubjectWidget(QWidget):
         self.lbl_session = QLabel("Session Type", session_container)
         session_layout.addWidget(self.lbl_session, 0, 0, 1, 1)
 
-        self.cb_session = _FocusComboBox(self._on_child_focused, session_container)
+        self.cb_session = QComboBox(session_container)
         self.cb_session.setMinimumWidth(125)
         font_cb = QFont()
         font_cb.setPointSize(9)
@@ -179,7 +133,7 @@ class SubjectWidget(QWidget):
         root.addWidget(top, 0, 0, 1, 1)
 
         # ── Notes text-edit ────────────────────────────────────────────
-        self.te_content = _FocusTextEdit(self._on_child_focused, self)
+        self.te_content = QTextEdit(self)
         font_te = QFont()
         font_te.setPointSize(12)
         self.te_content.setFont(font_te)
@@ -192,46 +146,6 @@ class SubjectWidget(QWidget):
         root.addWidget(self.te_content, 1, 0, 1, 1)
 
     # ──────────────────────────────────────────────────────────────────
-    # Focus-to-unfreeze
-    # ──────────────────────────────────────────────────────────────────
-
-    def _on_child_focused(self) -> None:
-        """Called whenever a child widget gains focus. Emit if frozen."""
-        if self._frozen:
-            self.focused.emit()
-
-    # ──────────────────────────────────────────────────────────────────
-    # Freeze / unfreeze  (called by MainWindow)
-    # ──────────────────────────────────────────────────────────────────
-
-    def freeze(self) -> None:
-        self._frozen = True
-        self.le_title.setReadOnly(True)
-        self.te_content.setReadOnly(True)
-        self.cb_session.setEnabled(False)
-        self.btn_play.setEnabled(False)
-        self.btn_reset.setEnabled(False)
-        self.setStyleSheet("""
-            SubjectWidget {
-                background: palette(window);
-                border: 1px solid palette(mid);
-            }
-            QLineEdit, QTextEdit {
-                background: palette(window);
-                color: palette(mid);
-            }
-        """)
-
-    def unfreeze(self) -> None:
-        self._frozen = False
-        self.le_title.setReadOnly(False)
-        self.te_content.setReadOnly(False)
-        self.cb_session.setEnabled(True)
-        self.btn_play.setEnabled(True)
-        self.btn_reset.setEnabled(True)
-        self.setStyleSheet("")
-
-    # ──────────────────────────────────────────────────────────────────
     # Timer
     # ──────────────────────────────────────────────────────────────────
 
@@ -239,12 +153,10 @@ class SubjectWidget(QWidget):
         if self._timer_running:
             self._qt_timer.stop()
             self._timer_running = False
-            # Change the button text to "Play" when paused
             self.btn_play.setText("Play")
         else:
             self._qt_timer.start()
             self._timer_running = True
-            # Change the button text to "Pause" when running
             self.btn_play.setText("Pause")
 
     def reset_timer(self) -> None:
@@ -252,6 +164,7 @@ class SubjectWidget(QWidget):
         self._timer_running = False
         self._elapsed_seconds = 0
         self._update_lcd()
+        self.btn_play.setText("Play")
 
     def _tick(self) -> None:
         self._elapsed_seconds += 1
@@ -310,5 +223,3 @@ class SubjectWidget(QWidget):
     @property
     def elapsed_seconds(self) -> int:
         return self._elapsed_seconds
-
-

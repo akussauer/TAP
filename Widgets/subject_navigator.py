@@ -85,11 +85,6 @@ class SubjectNavigator(QWidget):
                 color: palette(highlighted-text);
                 outline: none;
             }
-            QListWidget::item:hover {
-                border: 1px solid palette(highlight);
-                border-radius: 3px;
-            }                           
-                                       
             QListWidget::item:focus {
                 outline: none;
                 border: none;
@@ -98,6 +93,7 @@ class SubjectNavigator(QWidget):
 
         # Signals
         self.list_widget.currentRowChanged.connect(self._on_row_changed)
+        self.list_widget.currentRowChanged.connect(self._on_selection_style_changed)
         self.list_widget.model().rowsMoved.connect(self._on_rows_moved)
         self.list_widget.customContextMenuRequested.connect(self._on_context_menu)
 
@@ -166,17 +162,9 @@ class SubjectNavigator(QWidget):
     # ──────────────────────────────────────────────────────────────────
 
     def _style_item(self, item: QListWidgetItem, is_active: bool) -> None:
-        palette = self.list_widget.palette()
-        if is_active:
-            item.setForeground(palette.highlightedText())
-            item.setBackground(palette.highlight())
-            font = QFont()
-            font.setBold(True)
-            item.setFont(font)
-        else:
-            item.setForeground(palette.text())
-            item.setBackground(palette.base())
-            item.setFont(QFont())
+        font = QFont()
+        font.setBold(is_active)
+        item.setFont(font)
 
     def _restyle_item_at(self, row: int, frozen: bool) -> None:
         if row < 0 or row >= self.list_widget.count():
@@ -216,6 +204,13 @@ class SubjectNavigator(QWidget):
             return
         logical = self._row_to_logical(row)
         self.subject_selected.emit(logical)
+
+    def _on_selection_style_changed(self, current_row: int) -> None:
+        """Bold the newly selected row, unbold all others."""
+        for r in range(self.list_widget.count()):
+            item = self.list_widget.item(r)
+            if item:
+                self._style_item(item, is_active=(r == current_row))
 
     def _on_rows_moved(self, *_) -> None:
         """Fire order_changed after a drag-drop reorder."""

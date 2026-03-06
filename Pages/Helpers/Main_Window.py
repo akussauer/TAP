@@ -3,20 +3,11 @@
 main_window.py
 --------------
 Lesson controller.  Layout:
-  Left  →  SubjectNavigator  (replaces SubjectPlaceholder)
+  Left  →  SubjectNavigator  (replaces SubjectPlaceholder, max 200px)
   Right →  QStackedWidget    (one page per SubjectWidget, shown one at a time)
 
-Subject lifecycle
------------------
-1.  App opens            → one blank SubjectWidget (index 0) created, navigator shows it.
-2.  "New Subject"        → active subject is frozen + snapshotted, a new blank
-                           SubjectWidget is pushed onto the stack and selected.
-3.  Click navigator row  → stacked widget shows that subject's page.
-4.  Frozen subject       → SubjectWidget shows an "Edit" button; clicking it
-                           re-enables editing for that subject.
-5.  Drag-drop in nav     → subject list is reordered in-place; stacked widget
-                           pages are rearranged to match.
-6.  Delete via nav       → subject removed from stack + internal list.
+Subjects are always fully editable — no freeze/unfreeze logic.
+The navigator's bold highlight is the only indicator of which subject is current.
 """
 
 import json
@@ -27,6 +18,7 @@ import pdfkit
 import markdown as md_converter
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFileDialog,
     QMainWindow,
@@ -59,17 +51,15 @@ class MainWindow(QMainWindow):
         self.qt_timer.timeout.connect(self.timer_tick)
 
         # ── Subject management ────────────────────────────────────────
-        # Parallel lists – index N in each list corresponds to subject N
         self._subject_widgets: list[SubjectWidget] = []
-        self._subject_data_cache: list[dict] = []   # snapshots of frozen subjects
-        self._active_index: int = 0                 # which subject is currently "live"
+        self._active_index: int = 0
 
         # ── Replace placeholder widgets ───────────────────────────────
         self._setup_navigator()
         self._setup_stacked_area()
 
         # ── First blank subject ───────────────────────────────────────
-        self._add_subject_widget(label="Subject 1", make_active=True)
+        self._add_subject_widget(label="Subject 1")
 
         # ── Wiring ───────────────────────────────────────────────────
         self.connect_signals()
@@ -80,14 +70,9 @@ class MainWindow(QMainWindow):
     # ══════════════════════════════════════════════════════════════════
 
     def _setup_navigator(self) -> None:
-        """
-        Replace the SubjectPlaceholder QWidget from the designer file with
-        our SubjectNavigator, preserving its position in the grid.
-        """
         placeholder = self.ui.SubjectPlaceholder
-        parent_layout = self.ui.gridLayout_12   # top-level grid of centralwidget
+        parent_layout = self.ui.gridLayout_12
 
-        # Find which cell the placeholder occupies
         idx = parent_layout.indexOf(placeholder)
         row, col, rowspan, colspan = parent_layout.getItemPosition(idx)
 
@@ -98,12 +83,8 @@ class MainWindow(QMainWindow):
         parent_layout.addWidget(self.navigator, row, col, rowspan, colspan)
 
     def _setup_stacked_area(self) -> None:
-        """
-        Replace ContainerSubject (the designer's single-subject placeholder)
-        with a QStackedWidget that holds one SubjectWidget per subject.
-        """
         container_subject = self.ui.ContainerSubject
-        parent_layout = self.ui.gridLayout_11   # layout inside ContainerLesson
+        parent_layout = self.ui.gridLayout_11
 
         idx = parent_layout.indexOf(container_subject)
         row, col, rowspan, colspan = parent_layout.getItemPosition(idx)
@@ -119,32 +100,63 @@ class MainWindow(QMainWindow):
     # ══════════════════════════════════════════════════════════════════
 
     def connect_signals(self) -> None:
-        # Lesson timer
         self.ui.PBPPlayLesson.clicked.connect(self.StartStopTimer)
         self.ui.PBResetLesson.clicked.connect(self.timer_reset)
 
-        # Subject management
         self.ui.PBNewSubject.clicked.connect(self.on_new_subject)
         self.ui.PBEndLesson.clicked.connect(self.on_end_lesson)
 
-        # Navigator
         self.navigator.subject_selected.connect(self._on_navigator_select)
         self.navigator.order_changed.connect(self._on_order_changed)
         self.navigator.subject_deleted.connect(self._on_subject_deleted)
 
-        # File menu
         self.ui.actionNew.triggered.connect(self.on_action_new)
         self.ui.actionSave.triggered.connect(self.save_lesson)
         self.ui.actionMarkdown.triggered.connect(self.export_to_markdown)
         self.ui.actionPDF_2.triggered.connect(self.export_to_pdf)
         self.ui.actionHTML.triggered.connect(self.save_as_html)
 
+        self._setup_hotkeys()
+
+    def _setup_hotkeys(self) -> None:
+        """
+        Register QShortcuts from the 'Hotkeys' block in config.json.
+
+        Default config block (add this to your config.json if absent):
+        "Hotkeys": {
+            "new_subject":      "Ctrl+N",
+            "lesson_timer":     "Ctrl+T",
+            "subject_timer":    "Ctrl+Shift+T",
+            "save":             "Ctrl+S"
+        }
+        """
+        defaults = {
+            "new_subject":   "Ctrl+N",
+            "lesson_timer":  "Ctrl+T",
+            "subject_timer": "Ctrl+Shift+T",
+            "save":          "Ctrl+S",
+        }
+        hk = {**defaults, **self.configs.get("Hotkeys", {})}
+
+        actions = {
+            "new_subject":   self.on_new_subject,
+            "lesson_timer":  self.StartStopTimer,
+            "subject_timer": self._toggle_active_subject_timer,
+            "save":          self.save_lesson,
+        }
+
+        self._shortcuts: list[QShortcut] = []   # keep references alive
+        for key, slot in actions.items():
+            sequence = hk.get(key, defaults[key])
+            sc = QShortcut(QKeySequence(sequence), self)
+            sc.activated.connect(slot)
+            self._shortcuts.append(sc)
+
     # ══════════════════════════════════════════════════════════════════
     # Subject factory
     # ══════════════════════════════════════════════════════════════════
 
     def _make_subject_widget(self) -> SubjectWidget:
-        """Build a SubjectWidget and wire up its dependencies."""
         widget = SubjectWidget(parent=self)
 
         MarkdownHighlighter(
@@ -158,64 +170,25 @@ class MainWindow(QMainWindow):
         )
         widget.te_content._last_text_length = 0
 
-        # Live title → navigator label
         widget.le_title.textChanged.connect(
             lambda text, w=widget: self._on_title_changed(w, text)
         )
 
-        # Focus on a frozen subject → unfreeze it
-        widget.focused.connect(
-            lambda w=widget: self._on_edit_requested(w)
-        )
-
         return widget
 
-    def _add_subject_widget(self, label: str = "", make_active: bool = True) -> SubjectWidget:
-        """
-        Create a new SubjectWidget, register it in the stack and navigator,
-        optionally freeze the previously active subject first.
-        """
-        # Freeze the currently active subject before switching
-        if make_active and self._subject_widgets:
-            self._freeze_subject(self._active_index)
-
+    def _add_subject_widget(self, label: str = "") -> SubjectWidget:
         widget = self._make_subject_widget()
         logical_index = len(self._subject_widgets)
 
         self._subject_widgets.append(widget)
-        self._subject_data_cache.append({})         # placeholder; filled on freeze
         self.stack.addWidget(widget)
 
-        nav_label = label or f"Subject {logical_index + 1}"
-        self.navigator.add_subject(nav_label, is_active=make_active)
+        self.navigator.add_subject(label or f"Subject {logical_index + 1}", is_active=True)
 
-        if make_active:
-            self._active_index = logical_index
-            self.stack.setCurrentWidget(widget)
+        self._active_index = logical_index
+        self.stack.setCurrentWidget(widget)
 
         return widget
-
-    # ══════════════════════════════════════════════════════════════════
-    # Freeze / unfreeze
-    # ══════════════════════════════════════════════════════════════════
-
-    def _freeze_subject(self, logical_index: int) -> None:
-        """Snapshot and lock a subject widget."""
-        if logical_index >= len(self._subject_widgets):
-            return
-        widget = self._subject_widgets[logical_index]
-        snapshot = widget.to_dict()
-        snapshot["index"] = logical_index
-        self._subject_data_cache[logical_index] = snapshot
-        widget.freeze()
-
-    def _unfreeze_subject(self, logical_index: int) -> None:
-        """Re-enable editing for a frozen subject."""
-        if logical_index >= len(self._subject_widgets):
-            return
-        self._subject_widgets[logical_index].unfreeze()
-        self._active_index = logical_index
-        self.navigator.set_active_index(logical_index)
 
     # ══════════════════════════════════════════════════════════════════
     # Lesson timer
@@ -246,30 +219,26 @@ class MainWindow(QMainWindow):
         self.timer_time += 1
         self.ui.LCDDisplay_lesson.display(self._fmt_time(self.timer_time))
 
+    def _toggle_active_subject_timer(self) -> None:
+        """Ctrl+Shift+T — toggle the timer on whichever subject is currently shown."""
+        if self._subject_widgets:
+            self._subject_widgets[self._active_index].toggle_timer()
+
     # ══════════════════════════════════════════════════════════════════
     # Subject management slots
     # ══════════════════════════════════════════════════════════════════
 
     def on_new_subject(self) -> None:
         count = len(self._subject_widgets)
-        self._add_subject_widget(label=f"Subject {count + 1}", make_active=True)
+        self._add_subject_widget(label=f"Subject {count + 1}")
 
     def _on_navigator_select(self, logical_index: int) -> None:
-        """User clicked a row in the navigator — show that subject's page."""
         if logical_index < 0 or logical_index >= len(self._subject_widgets):
             return
+        self._active_index = logical_index
         self.stack.setCurrentWidget(self._subject_widgets[logical_index])
 
-    def _on_edit_requested(self, widget: SubjectWidget) -> None:
-        """User clicked the Edit button on a frozen subject."""
-        try:
-            logical_index = self._subject_widgets.index(widget)
-        except ValueError:
-            return
-        self._unfreeze_subject(logical_index)
-
     def _on_title_changed(self, widget: SubjectWidget, text: str) -> None:
-        """Propagate title edits to the navigator label in real-time."""
         try:
             logical_index = self._subject_widgets.index(widget)
         except ValueError:
@@ -277,47 +246,33 @@ class MainWindow(QMainWindow):
         self.navigator.refresh_item(logical_index, text)
 
     def _on_order_changed(self, new_order: list[int]) -> None:
-        """
-        Drag-drop reordered the navigator rows.
-        new_order[i] = old logical index now at visual position i.
-        Reorder _subject_widgets and _subject_data_cache to match.
-        """
         self._subject_widgets = [self._subject_widgets[i] for i in new_order]
-        self._subject_data_cache = [self._subject_data_cache[i] for i in new_order]
 
-        # Update stack order to match (rebuild by re-inserting pages)
-        for i, widget in enumerate(self._subject_widgets):
+        for widget in self._subject_widgets:
             self.stack.removeWidget(widget)
         for widget in self._subject_widgets:
             self.stack.addWidget(widget)
 
-        # Recalculate active index
         self._active_index = new_order.index(self._active_index) if self._active_index in new_order else 0
         self.stack.setCurrentWidget(self._subject_widgets[self._active_index])
 
     def _on_subject_deleted(self, logical_index: int) -> None:
-        """Remove a subject entirely."""
         if len(self._subject_widgets) <= 1:
             QMessageBox.information(self, "Cannot Delete", "A lesson must have at least one subject.")
             return
 
         widget = self._subject_widgets.pop(logical_index)
-        self._subject_data_cache.pop(logical_index)
-
         self.stack.removeWidget(widget)
         widget.deleteLater()
         self.navigator.remove_subject(logical_index)
 
-        # Clamp active index and show the nearest subject
         self._active_index = min(self._active_index, len(self._subject_widgets) - 1)
         self.stack.setCurrentWidget(self._subject_widgets[self._active_index])
         self.navigator.set_active_index(self._active_index)
 
     def on_end_lesson(self) -> None:
         reply = QMessageBox.question(
-            self,
-            "End Lesson",
-            "End the lesson and save?",
+            self, "End Lesson", "End the lesson and save?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -330,7 +285,6 @@ class MainWindow(QMainWindow):
     # ══════════════════════════════════════════════════════════════════
 
     def _build_lesson_dict(self) -> dict:
-        """Collect live data from all subject widgets into a nested dict."""
         subjects = []
         for i, widget in enumerate(self._subject_widgets):
             snap = widget.to_dict()
@@ -353,8 +307,7 @@ class MainWindow(QMainWindow):
         title = lesson["lesson_name"] or "lesson"
 
         file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Lesson",
+            self, "Save Lesson",
             os.path.join(self.file_func.downloads_path, f"{title}.json"),
             "JSON Files (*.json)",
         )
@@ -383,16 +336,11 @@ class MainWindow(QMainWindow):
         self.timer_time = int(data.get("lesson_elapsed_seconds", 0))
         self.ui.LCDDisplay_lesson.display(self._fmt_time(self.timer_time))
 
-        subjects = data.get("subjects", [])
-        for i, subj_data in enumerate(subjects):
-            is_last = i == len(subjects) - 1
+        for i, subj_data in enumerate(data.get("subjects", [])):
             widget = self._add_subject_widget(
                 label=subj_data.get("title") or f"Subject {i + 1}",
-                make_active=is_last,
             )
             widget.from_dict(subj_data)
-            if not is_last:
-                self._freeze_subject(i)
 
     def on_action_new(self) -> None:
         has_content = len(self._subject_widgets) > 1 or bool(
@@ -400,9 +348,7 @@ class MainWindow(QMainWindow):
         )
         if has_content:
             reply = QMessageBox.question(
-                self,
-                "New Lesson",
-                "Discard current lesson and start fresh?",
+                self, "New Lesson", "Discard current lesson and start fresh?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             )
             if reply != QMessageBox.StandardButton.Yes:
@@ -419,11 +365,10 @@ class MainWindow(QMainWindow):
             self.stack.removeWidget(widget)
             widget.deleteLater()
         self._subject_widgets.clear()
-        self._subject_data_cache.clear()
 
         self.navigator.clear()
         self._active_index = 0
-        self._add_subject_widget(label="Subject 1", make_active=True)
+        self._add_subject_widget(label="Subject 1")
 
     # ══════════════════════════════════════════════════════════════════
     # Bracket auto-pairing
