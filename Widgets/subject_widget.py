@@ -14,9 +14,10 @@ from PySide6.QtWidgets import (
 
 
 class SubjectWidget(QWidget):
-
     DEFAULT_SESSION_TYPES = [
-        "Lecture", "Exercise", "Discussion", "Break", "Other",
+        "Lecture", "Exercise", "Discussion",
+        "Break", "Demo", "Group Work",
+        "Other",
     ]
 
     def __init__(self, session_types=None, parent=None):

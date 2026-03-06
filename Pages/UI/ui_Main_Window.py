@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'Main_Window_2pXqbDW.ui'
+## Form generated from reading UI file 'Main_Window_2QtIsYs.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.1
 ##
@@ -51,6 +51,8 @@ class Ui_Main_Window(object):
         self.action_PDF.setObjectName(u"action_PDF")
         self.actionSettings = QAction(Main_Window)
         self.actionSettings.setObjectName(u"actionSettings")
+        self.actionSave_2 = QAction(Main_Window)
+        self.actionSave_2.setObjectName(u"actionSave_2")
         self.centralwidget = QWidget(Main_Window)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_12 = QGridLayout(self.centralwidget)
@@ -330,6 +332,7 @@ class Ui_Main_Window(object):
         self.menubar.addAction(self.menuFile.menuAction())
         self.menuFile.addAction(self.action_New)
         self.menuFile.addAction(self.action_Open)
+        self.menuFile.addAction(self.actionSave_2)
         self.menuFile.addAction(self.menuExport.menuAction())
         self.menuFile.addAction(self.actionSettings)
         self.menuExport.addAction(self.action_Markdown)
@@ -357,6 +360,7 @@ class Ui_Main_Window(object):
         self.action_HTML.setText(QCoreApplication.translate("Main_Window", u"HTML", None))
         self.action_PDF.setText(QCoreApplication.translate("Main_Window", u"PDF", None))
         self.actionSettings.setText(QCoreApplication.translate("Main_Window", u"Settings", None))
+        self.actionSave_2.setText(QCoreApplication.translate("Main_Window", u"Save", None))
         self.PBPlaySubject_0.setText(QCoreApplication.translate("Main_Window", u"Play/Pause", None))
         self.PBResetSubject_0.setText(QCoreApplication.translate("Main_Window", u"Reset", None))
         self.LELessonTitle_0.setInputMask("")

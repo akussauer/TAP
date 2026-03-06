@@ -1,5 +1,6 @@
 from Pages.UI.ui_Settings_Dialog import Ui_SettingsDialog
 from Widgets.HotKeyLineEdit import HotkeyLineEdit
+from Widgets.colour_button import ColourButton
 
 from PySide6.QtWidgets import QDialog
 
@@ -11,13 +12,13 @@ _STYLE_OPTIONS  = {"Default": "default", "Fusion": "fusion"}
 _THEME_DISPLAY  = {v: k for k, v in _THEME_OPTIONS.items()}
 _STYLE_DISPLAY  = {v: k for k, v in _STYLE_OPTIONS.items()}
 
-_MARKDOWN_COLOUR = "#9B4A1C" # Used for preview text in settings dialog; matches default style's markdown colour
+_MARKDOWN_COLOUR = "#0E80A3" # Used for preview text in settings dialog; matches default style's markdown colour
 
 _HOTKEY_FIELDS = [
     ("LE_NewSubject", "new_subject"),
     ("LE_LessTimer",  "lesson_timer"),
     ("LE_SubTimer",   "subject_timer"),
-    ("LE_Save",       "save"),
+    ("LE_Save",       "save")
 ]
 
 _LANG_OPTIONS = [
@@ -26,6 +27,7 @@ _LANG_OPTIONS = [
     'en_JM', 'en_NA', 'en_NG', 'en_NZ', 'en_PH', 'en_SG',
     'en_TT', 'en_US', 'en_ZA', 'en_ZW',
 ]
+
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, file_func=None):
@@ -36,6 +38,7 @@ class SettingsDialog(QDialog):
         self.file_func = file_func
 
         self._replace_hotkey_edits()
+        self._replace_colour_button()
         self._populate_combos()
         self._load_current_settings()
         self._connect_signals()
@@ -60,6 +63,15 @@ class SettingsDialog(QDialog):
             new.show()
             old.hide()
             old.deleteLater()
+
+    def _replace_colour_button(self) -> None:
+        """Swap the placeholder QPushButton for a ColourButton."""
+        old = self.ui.PHColour
+        self.colour_btn = ColourButton(colour=_MARKDOWN_COLOUR, parent=old.parent())
+        self.ui.gridLayout_12.replaceWidget(old, self.colour_btn)
+        self.colour_btn.show()
+        old.hide()
+        old.deleteLater()
 
     def _populate_combos(self) -> None:
         """Fill combo boxes with available options."""
@@ -89,6 +101,9 @@ class SettingsDialog(QDialog):
             if hasattr(self.ui, ui_name):
                 getattr(self.ui, ui_name).setText(hotkeys.get(cfg_key, ""))
 
+        # Markdown colour
+        self.colour_btn.set_colour(cfg.get("markdown_colour", _MARKDOWN_COLOUR))
+
     def _connect_signals(self) -> None:
         self.ui.ButtonSave.clicked.connect(self.save_settings)
         self.ui.ButtonReset.clicked.connect(self.reset_settings)
@@ -99,10 +114,11 @@ class SettingsDialog(QDialog):
 
     def save_settings(self) -> None:
         settings = {
-            "theme":    _THEME_OPTIONS.get(self.ui.CBTheme.currentText(), "system"),
-            "style":    _STYLE_OPTIONS.get(self.ui.CBStyle.currentText(), "default"),
-            "Language": self.ui.CBLang.currentText(),
-            "Hotkeys":  self._read_hotkeys(),
+            "theme":            _THEME_OPTIONS.get(self.ui.CBTheme.currentText(), "system"),
+            "style":            _STYLE_OPTIONS.get(self.ui.CBStyle.currentText(), "default"),
+            "Language":         self.ui.CBLang.currentText(),
+            "markdown_colour":  self.colour_btn.colour(),
+            "Hotkeys":          self._read_hotkeys(),
         }
 
         if self.file_func:

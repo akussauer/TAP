@@ -17,13 +17,14 @@ import re
 import pdfkit
 import markdown as md_converter
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFileDialog,
     QMainWindow,
     QMessageBox,
     QStackedWidget,
+    QWidget,
 )
 
 from Pages.UI.ui_Main_Window import Ui_Main_Window
@@ -39,6 +40,16 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.ui = Ui_Main_Window()
         self.ui.setupUi(self)
+
+        # Exclude hidden placeholder widgets and toolbar buttons from tab chain
+        for w in (
+            self.ui.LELessonTitle_0,
+            self.ui.CBSessionType_0,
+            self.ui.TEContent_0,
+            self.ui.PBNewSubject,
+            self.ui.PBEndLesson,
+        ):
+            w.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # ── External helpers ──────────────────────────────────────────
         self.file_func = FunctionsFile(parent=self)
@@ -114,7 +125,7 @@ class MainWindow(QMainWindow):
 
         self.ui.action_New.triggered.connect(self.on_action_new)
         self.ui.action_Open.triggered.connect(self.on_action_open)
-        self.ui.actionSave.triggered.connect(self.save_lesson)
+        self.ui.actionSave_2.triggered.connect(self.save_lesson)
         self.ui.action_Markdown.triggered.connect(self.export_to_markdown)
         self.ui.action_PDF.triggered.connect(self.export_to_pdf)
         self.ui.action_HTML.triggered.connect(self.save_as_html)
@@ -194,6 +205,9 @@ class MainWindow(QMainWindow):
 
         self._active_index = logical_index
         self.stack.setCurrentWidget(widget)
+        QWidget.setTabOrder(self.ui.LELessonName, widget.le_title)
+        QWidget.setTabOrder(widget.le_title, widget.cb_session)
+        QWidget.setTabOrder(widget.cb_session, widget.te_content)
 
         return widget
 
@@ -210,7 +224,7 @@ class MainWindow(QMainWindow):
     def timer_start(self) -> None:
         self.timer_running = True
         self.qt_timer.start()
-        self.ui.PBPPlayLesson.setText("Stop")
+        self.ui.PBPPlayLesson.setText("Pause")
 
     def timer_stop(self) -> None:
         self.timer_running = False
@@ -243,7 +257,11 @@ class MainWindow(QMainWindow):
         if logical_index < 0 or logical_index >= len(self._subject_widgets):
             return
         self._active_index = logical_index
-        self.stack.setCurrentWidget(self._subject_widgets[logical_index])
+        widget = self._subject_widgets[logical_index]
+        self.stack.setCurrentWidget(widget)
+        QWidget.setTabOrder(self.ui.LELessonName, widget.le_title)
+        QWidget.setTabOrder(widget.le_title, widget.cb_session)
+        QWidget.setTabOrder(widget.cb_session, widget.te_content)
 
     def _on_title_changed(self, widget: SubjectWidget, text: str) -> None:
         try:
