@@ -4,7 +4,7 @@ import os
 import platform
 from platformdirs import user_data_dir
 from pathlib import Path
-import pandas as pd
+import json
 
 from PySide6.QtWidgets import QApplication
 
@@ -20,17 +20,13 @@ def load_config():
     config_path = os.path.join(app_data_path, "config.json")
     if not os.path.exists(config_path):
         return None
-    # Read the file if it exists, otherwise return None
-    config_data = pd.read_json(config_path, orient="records", lines=True).iloc[0]
 
-    if config_data.empty:
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data
+    except (json.JSONDecodeError, OSError):
         return None
-    
-    # Check for required keys in the config data
-    if "theme" not in config_data or "file_location" not in config_data or "Language" not in config_data:
-        return None
-    
-    return config_data
 
 if __name__ == "__main__":
     config = load_config()

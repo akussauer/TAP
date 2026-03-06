@@ -7,11 +7,15 @@
     <x>0</x>
     <y>0</y>
     <width>1035</width>
-    <height>664</height>
+    <height>652</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>TAP</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../Resources/Icons/Resource_file.qrc">
+    <normaloff>:/Files/write.png</normaloff>:/Files/write.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_12">
@@ -478,7 +482,7 @@
                    <enum>Qt::FocusPolicy::NoFocus</enum>
                   </property>
                   <property name="text">
-                   <string>Play/Pause</string>
+                   <string>Play</string>
                   </property>
                  </widget>
                 </item>
@@ -537,22 +541,16 @@
      <property name="title">
       <string>Export</string>
      </property>
-     <addaction name="actionMarkdown"/>
-     <addaction name="actionDocX"/>
-     <addaction name="actionPDF_2"/>
-     <addaction name="actionHTML"/>
+     <addaction name="action_Markdown"/>
+     <addaction name="action_HTML"/>
+     <addaction name="action_PDF"/>
     </widget>
-    <addaction name="actionNew"/>
-    <addaction name="actionSave"/>
+    <addaction name="action_New"/>
+    <addaction name="action_Open"/>
     <addaction name="menuExport"/>
-   </widget>
-   <widget class="QMenu" name="menuSettings">
-    <property name="title">
-     <string>Settings</string>
-    </property>
+    <addaction name="actionSettings"/>
    </widget>
    <addaction name="menuFile"/>
-   <addaction name="menuSettings"/>
   </widget>
   <action name="actionSave">
    <property name="text">
@@ -574,7 +572,7 @@
     <string>PDF</string>
    </property>
   </action>
-  <action name="actionDocX">
+  <action name="action">
    <property name="text">
     <string>DocX</string>
    </property>
@@ -589,7 +587,52 @@
     <string>HTML</string>
    </property>
   </action>
+  <action name="actionOpen">
+   <property name="text">
+    <string>Open</string>
+   </property>
+  </action>
+  <action name="action_New">
+   <property name="text">
+    <string>New</string>
+   </property>
+  </action>
+  <action name="action_Open">
+   <property name="text">
+    <string>Open</string>
+   </property>
+  </action>
+  <action name="action_Markdown">
+   <property name="text">
+    <string>Markdown</string>
+   </property>
+  </action>
+  <action name="action_HTML">
+   <property name="text">
+    <string>HTML</string>
+   </property>
+  </action>
+  <action name="action_PDF">
+   <property name="text">
+    <string>PDF</string>
+   </property>
+  </action>
+  <action name="actionSettings">
+   <property name="text">
+    <string>Settings</string>
+   </property>
+  </action>
  </widget>
- <resources/>
+ <tabstops>
+  <tabstop>LELessonName</tabstop>
+  <tabstop>LELessonTitle_0</tabstop>
+  <tabstop>CBSessionType_0</tabstop>
+  <tabstop>TEContent_0</tabstop>
+  <tabstop>PBNewSubject</tabstop>
+  <tabstop>PBEndLesson</tabstop>
+ </tabstops>
+ <resources>
+  <include location="../Resources/Icons/Resource_file.qrc"/>
+ </resources>
  <connections/>
 </ui>

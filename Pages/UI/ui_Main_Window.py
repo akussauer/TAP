@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'Main_Window_2isohig.ui'
+## Form generated from reading UI file 'Main_Window_2pXqbDW.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.1
 ##
@@ -10,7 +10,7 @@
 
 from PySide6.QtCore import (QCoreApplication, QMetaObject, QRect,
     QSize, Qt)
-from PySide6.QtGui import (QAction, QFont)
+from PySide6.QtGui import (QAction, QFont, QIcon)
 from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout,
     QLCDNumber, QLabel, QLineEdit, QMenu, QMenuBar, QPushButton, QSizePolicy,
     QTextEdit, QWidget)
@@ -19,7 +19,10 @@ class Ui_Main_Window(object):
     def setupUi(self, Main_Window):
         if not Main_Window.objectName():
             Main_Window.setObjectName(u"Main_Window")
-        Main_Window.resize(1035, 664)
+        Main_Window.resize(1035, 652)
+        icon = QIcon()
+        icon.addFile(u"Resources/Icons/write.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        Main_Window.setWindowIcon(icon)
         self.actionSave = QAction(Main_Window)
         self.actionSave.setObjectName(u"actionSave")
         self.actionNew = QAction(Main_Window)
@@ -28,12 +31,26 @@ class Ui_Main_Window(object):
         self.actionMarkdown.setObjectName(u"actionMarkdown")
         self.actionPDF = QAction(Main_Window)
         self.actionPDF.setObjectName(u"actionPDF")
-        self.actionDocX = QAction(Main_Window)
-        self.actionDocX.setObjectName(u"actionDocX")
+        self.action = QAction(Main_Window)
+        self.action.setObjectName(u"action")
         self.actionPDF_2 = QAction(Main_Window)
         self.actionPDF_2.setObjectName(u"actionPDF_2")
         self.actionHTML = QAction(Main_Window)
         self.actionHTML.setObjectName(u"actionHTML")
+        self.actionOpen = QAction(Main_Window)
+        self.actionOpen.setObjectName(u"actionOpen")
+        self.action_New = QAction(Main_Window)
+        self.action_New.setObjectName(u"action_New")
+        self.action_Open = QAction(Main_Window)
+        self.action_Open.setObjectName(u"action_Open")
+        self.action_Markdown = QAction(Main_Window)
+        self.action_Markdown.setObjectName(u"action_Markdown")
+        self.action_HTML = QAction(Main_Window)
+        self.action_HTML.setObjectName(u"action_HTML")
+        self.action_PDF = QAction(Main_Window)
+        self.action_PDF.setObjectName(u"action_PDF")
+        self.actionSettings = QAction(Main_Window)
+        self.actionSettings.setObjectName(u"actionSettings")
         self.centralwidget = QWidget(Main_Window)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_12 = QGridLayout(self.centralwidget)
@@ -303,19 +320,21 @@ class Ui_Main_Window(object):
         self.menuFile.setObjectName(u"menuFile")
         self.menuExport = QMenu(self.menuFile)
         self.menuExport.setObjectName(u"menuExport")
-        self.menuSettings = QMenu(self.menubar)
-        self.menuSettings.setObjectName(u"menuSettings")
         Main_Window.setMenuBar(self.menubar)
+        QWidget.setTabOrder(self.LELessonName, self.LELessonTitle_0)
+        QWidget.setTabOrder(self.LELessonTitle_0, self.CBSessionType_0)
+        QWidget.setTabOrder(self.CBSessionType_0, self.TEContent_0)
+        QWidget.setTabOrder(self.TEContent_0, self.PBNewSubject)
+        QWidget.setTabOrder(self.PBNewSubject, self.PBEndLesson)
 
         self.menubar.addAction(self.menuFile.menuAction())
-        self.menubar.addAction(self.menuSettings.menuAction())
-        self.menuFile.addAction(self.actionNew)
-        self.menuFile.addAction(self.actionSave)
+        self.menuFile.addAction(self.action_New)
+        self.menuFile.addAction(self.action_Open)
         self.menuFile.addAction(self.menuExport.menuAction())
-        self.menuExport.addAction(self.actionMarkdown)
-        self.menuExport.addAction(self.actionDocX)
-        self.menuExport.addAction(self.actionPDF_2)
-        self.menuExport.addAction(self.actionHTML)
+        self.menuFile.addAction(self.actionSettings)
+        self.menuExport.addAction(self.action_Markdown)
+        self.menuExport.addAction(self.action_HTML)
+        self.menuExport.addAction(self.action_PDF)
 
         self.retranslateUi(Main_Window)
 
@@ -323,15 +342,22 @@ class Ui_Main_Window(object):
     # setupUi
 
     def retranslateUi(self, Main_Window):
-        Main_Window.setWindowTitle(QCoreApplication.translate("Main_Window", u"MainWindow", None))
+        Main_Window.setWindowTitle(QCoreApplication.translate("Main_Window", u"TAP", None))
         self.actionSave.setText(QCoreApplication.translate("Main_Window", u"Save", None))
         self.actionNew.setText(QCoreApplication.translate("Main_Window", u"New", None))
         self.actionMarkdown.setText(QCoreApplication.translate("Main_Window", u"Markdown", None))
         self.actionPDF.setText(QCoreApplication.translate("Main_Window", u"PDF", None))
-        self.actionDocX.setText(QCoreApplication.translate("Main_Window", u"DocX", None))
+        self.action.setText(QCoreApplication.translate("Main_Window", u"DocX", None))
         self.actionPDF_2.setText(QCoreApplication.translate("Main_Window", u"PDF", None))
         self.actionHTML.setText(QCoreApplication.translate("Main_Window", u"HTML", None))
-        self.PBPlaySubject_0.setText(QCoreApplication.translate("Main_Window", u"Play", None))
+        self.actionOpen.setText(QCoreApplication.translate("Main_Window", u"Open", None))
+        self.action_New.setText(QCoreApplication.translate("Main_Window", u"New", None))
+        self.action_Open.setText(QCoreApplication.translate("Main_Window", u"Open", None))
+        self.action_Markdown.setText(QCoreApplication.translate("Main_Window", u"Markdown", None))
+        self.action_HTML.setText(QCoreApplication.translate("Main_Window", u"HTML", None))
+        self.action_PDF.setText(QCoreApplication.translate("Main_Window", u"PDF", None))
+        self.actionSettings.setText(QCoreApplication.translate("Main_Window", u"Settings", None))
+        self.PBPlaySubject_0.setText(QCoreApplication.translate("Main_Window", u"Play/Pause", None))
         self.PBResetSubject_0.setText(QCoreApplication.translate("Main_Window", u"Reset", None))
         self.LELessonTitle_0.setInputMask("")
         self.LELessonTitle_0.setText("")
@@ -345,6 +371,5 @@ class Ui_Main_Window(object):
         self.PBResetLesson.setText(QCoreApplication.translate("Main_Window", u"Reset", None))
         self.menuFile.setTitle(QCoreApplication.translate("Main_Window", u"File", None))
         self.menuExport.setTitle(QCoreApplication.translate("Main_Window", u"Export", None))
-        self.menuSettings.setTitle(QCoreApplication.translate("Main_Window", u"Settings", None))
     # retranslateUi
 

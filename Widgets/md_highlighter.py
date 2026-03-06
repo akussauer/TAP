@@ -5,10 +5,21 @@ from PySide6.QtWidgets import QMessageBox
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 
 class MarkdownHighlighter(QSyntaxHighlighter):
-    def __init__(self, document, parent=None, language="en_GB"):
+    def __init__(self, document, parent=None, file_func=None, language="en_GB"):
         super().__init__(document)
         self.parent = parent
+        self.file_func = file_func
         self.rules = []
+
+        if self.file_func:
+            config = self.file_func.get_configs()
+            if config and "Language" in config:
+                language = config["Language"]
+                colour = config["markdown_colour"]
+            else:
+                colour ="#0E80A3"
+        else:
+            colour = "#0E80A3"
 
         # Spell checker
         try:
@@ -23,40 +34,40 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self.spell_error_fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SpellCheckUnderline)
 
         # --- Headings (# ## ###) — orange/gold
-        self._add_rule(r'^#{1,6} .+', "#E5A00D", bold=True)
+        self._add_rule(r'^#{1,6} .+', colour, bold=True)
 
         # --- Bold (**text**) — white/bright
-        self._add_rule(r'\*\*.+?\*\*', "#FFFFFF", bold=True)
+        self._add_rule(r'\*\*.+?\*\*', colour, bold=True)
 
         # --- Italic (*text*) — light grey
-        self._add_rule(r'\*.+?\*', "#BBBBBB", italic=True)
+        self._add_rule(r'\*.+?\*', colour, italic=True)
 
         # --- Strikethrough (~~text~~) — muted red
-        self._add_rule(r'~~.+?~~', "#E06C6C")
+        self._add_rule(r'~~.+?~~', colour)
 
         # --- Ordered list (1. 2. etc) — light blue
-        self._add_rule(r'^\d+\.', "#6FC3E0")
+        self._add_rule(r'^\d+\.', colour)
 
         # --- Unordered list (- or *) — light blue
-        self._add_rule(r'^[\-\*] ', "#6FC3E0")
+        self._add_rule(r'^[\-\*] ', colour)
 
         # --- Inline code (`code`) — green
-        self._add_rule(r'`.+?`', "#4EC994")
+        self._add_rule(r'`.+?`', colour)
 
         # --- Block quote (>) — muted purple
-        self._add_rule(r'^> .+', "#9B8FD4")
+        self._add_rule(r'^> .+', colour)
 
         # --- Breaking line (<br>) — muted red
-        self._add_rule(r'<br\s*/?>', "#E06C6C")
+        self._add_rule(r'<br\s*/?>', colour)
 
         # --- Checkboxes (- [ ] or - [x]) — light blue
-        self._add_rule(r'^- \[[ xX]\] ', "#6FC3E0")
+        self._add_rule(r'^- \[[ xX]\] ', colour)
 
         # --- Links ([text](url)) — blue
-        self._add_rule(r'\[.+?\]\(.+?\)', "#4A9EE0")
+        self._add_rule(r'\[.+?\]\(.+?\)', colour)
 
         # --- Horizontal rule (--- or ***) — muted red
-        self._add_rule(r'^(\-{3,}|\*{3,})', "#E06C6C")
+        self._add_rule(r'^(\-{3,}|\*{3,})', colour)
 
     def _add_rule(self, pattern, color, bold=False, italic=False):
         fmt = QTextCharFormat()

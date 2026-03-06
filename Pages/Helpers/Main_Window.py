@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from Pages.UI.ui_Main_Window import Ui_Main_Window
+from Pages.Helpers.Settings_Dialog import SettingsDialog
 from Widgets.md_highlighter import MarkdownHighlighter
 from Widgets.subject_widget import SubjectWidget
 from Widgets.subject_navigator import SubjectNavigator
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow):
         # ── Subject management ────────────────────────────────────────
         self._subject_widgets: list[SubjectWidget] = []
         self._active_index: int = 0
+        self._current_file_path: str | None = None   # set after save/open
 
         # ── Replace placeholder widgets ───────────────────────────────
         self._setup_navigator()
@@ -110,11 +112,13 @@ class MainWindow(QMainWindow):
         self.navigator.order_changed.connect(self._on_order_changed)
         self.navigator.subject_deleted.connect(self._on_subject_deleted)
 
-        self.ui.actionNew.triggered.connect(self.on_action_new)
+        self.ui.action_New.triggered.connect(self.on_action_new)
+        self.ui.action_Open.triggered.connect(self.on_action_open)
         self.ui.actionSave.triggered.connect(self.save_lesson)
-        self.ui.actionMarkdown.triggered.connect(self.export_to_markdown)
-        self.ui.actionPDF_2.triggered.connect(self.export_to_pdf)
-        self.ui.actionHTML.triggered.connect(self.save_as_html)
+        self.ui.action_Markdown.triggered.connect(self.export_to_markdown)
+        self.ui.action_PDF.triggered.connect(self.export_to_pdf)
+        self.ui.action_HTML.triggered.connect(self.save_as_html)
+        self.ui.actionSettings.triggered.connect(self.open_settings)
 
         self._setup_hotkeys()
 
@@ -135,6 +139,7 @@ class MainWindow(QMainWindow):
             "lesson_timer":  "Ctrl+T",
             "subject_timer": "Ctrl+Shift+T",
             "save":          "Ctrl+S",
+            "open":          "Ctrl+O",
         }
         hk = {**defaults, **self.configs.get("Hotkeys", {})}
 
@@ -143,6 +148,7 @@ class MainWindow(QMainWindow):
             "lesson_timer":  self.StartStopTimer,
             "subject_timer": self._toggle_active_subject_timer,
             "save":          self.save_lesson,
+            "open":          self.on_action_open,
         }
 
         self._shortcuts: list[QShortcut] = []   # keep references alive
@@ -162,6 +168,7 @@ class MainWindow(QMainWindow):
         MarkdownHighlighter(
             widget.te_content.document(),
             parent=self,
+            file_func=self.file_func,
             language=self.configs.get("Language", "english").lower(),
         )
 
@@ -303,6 +310,17 @@ class MainWindow(QMainWindow):
     # ══════════════════════════════════════════════════════════════════
 
     def save_lesson(self) -> None:
+        """
+        Save to the current file path if one exists (i.e. previously saved/opened),
+        otherwise fall through to save-as to prompt for a location.
+        """
+        if self._current_file_path:
+            self._write_lesson(self._current_file_path)
+        else:
+            self.save_lesson_as()
+
+    def save_lesson_as(self) -> None:
+        """Always prompt for a new file location."""
         lesson = self._build_lesson_dict()
         title = lesson["lesson_name"] or "lesson"
 
@@ -316,11 +334,44 @@ class MainWindow(QMainWindow):
         if not file_path.endswith(".json"):
             file_path += ".json"
 
+        self._write_lesson(file_path)
+
+    def _write_lesson(self, path: str) -> None:
         try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(lesson, f, indent=4, ensure_ascii=False)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self._build_lesson_dict(), f, indent=4, ensure_ascii=False)
+            self._current_file_path = path
+            self._update_title_bar()
         except OSError as e:
             QMessageBox.critical(self, "Save Failed", f"Could not save file:\n{e}")
+
+    def on_action_open(self) -> None:
+        """Prompt for a .json lesson file, offer to save current work first."""
+        has_content = len(self._subject_widgets) > 1 or bool(
+            self._subject_widgets and self._subject_widgets[0].le_title.text()
+        )
+        if has_content:
+            reply = QMessageBox.question(
+                self, "Open Lesson",
+                "Save current lesson before opening another?",
+                QMessageBox.StandardButton.Save |
+                QMessageBox.StandardButton.Discard |
+                QMessageBox.StandardButton.Cancel,
+            )
+            if reply == QMessageBox.StandardButton.Cancel:
+                return
+            if reply == QMessageBox.StandardButton.Save:
+                self.save_lesson()
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open Lesson",
+            self.file_func.downloads_path,
+            "JSON Files (*.json)",
+        )
+        if not file_path:
+            return
+
+        self.load_from_file(file_path)
 
     def load_from_file(self, path: str) -> None:
         try:
@@ -330,7 +381,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Load Error", str(e))
             return
 
-        self._clear_all()
+        self._clear_all(skip_default=True)
 
         self.ui.LELessonName.setText(data.get("lesson_name", ""))
         self.timer_time = int(data.get("lesson_elapsed_seconds", 0))
@@ -341,6 +392,17 @@ class MainWindow(QMainWindow):
                 label=subj_data.get("title") or f"Subject {i + 1}",
             )
             widget.from_dict(subj_data)
+
+        self._current_file_path = path
+        self._update_title_bar()
+
+    def _update_title_bar(self) -> None:
+        """Show the open filename in the window title."""
+        if self._current_file_path:
+            name = os.path.basename(self._current_file_path)
+            self.setWindowTitle(f"{name} — Lesson Notes")
+        else:
+            self.setWindowTitle("Lesson Notes")
 
     def on_action_new(self) -> None:
         has_content = len(self._subject_widgets) > 1 or bool(
@@ -355,7 +417,7 @@ class MainWindow(QMainWindow):
                 return
         self._clear_all()
 
-    def _clear_all(self) -> None:
+    def _clear_all(self, skip_default: bool = False) -> None:
         self.timer_stop()
         self.timer_time = 0
         self.ui.LCDDisplay_lesson.display("00:00:00")
@@ -368,7 +430,11 @@ class MainWindow(QMainWindow):
 
         self.navigator.clear()
         self._active_index = 0
-        self._add_subject_widget(label="Subject 1")
+        self._current_file_path = None
+        self._update_title_bar()
+
+        if not skip_default:
+            self._add_subject_widget(label="Subject 1")
 
     # ══════════════════════════════════════════════════════════════════
     # Bracket auto-pairing
@@ -558,3 +624,11 @@ class MainWindow(QMainWindow):
             pdfkit.from_string(self._build_full_html(), save_path, configuration=config, options=options)
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", f"Could not write PDF:\n{e}")
+
+    # ══════════════════════════════════════════════════════════════════
+    # Settings dialog
+    # ══════════════════════════════════════════════════════════════════
+
+    def open_settings(self):
+        dialog = SettingsDialog(self, file_func=self.file_func)
+        dialog.exec()
