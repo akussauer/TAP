@@ -60,7 +60,13 @@ class FunctionsFile:
                         "theme": "system",
                         "style": "default",
                         "file_location": "default",
-                        "Language": "en_GB"
+                        "Language": "en_GB",
+                        "Hotkeys": {
+                            "new_subject":   "Ctrl+N",
+                            "lesson_timer":  "Ctrl+T",
+                            "subject_timer": "Ctrl+Shift+T",
+                            "save":          "Ctrl+S"
+                        }
                     }, f)
                     
         except Exception as e:
@@ -99,6 +105,12 @@ class FunctionsFile:
                     "theme": "system",
                     "style": "default",
                     "file_location": "default",
-                    "Language": "en_GB"
+                    "Language": "en_GB",
+                    "Hotkeys": {
+                        "new_subject":   "Ctrl+N",
+                        "lesson_timer":  "Ctrl+T",
+                        "subject_timer": "Ctrl+Shift+T",
+                        "save":          "Ctrl+S"
+                    }
                 }, f)
         return pd.read_json(config_path, orient="records", lines=True).iloc[0]
