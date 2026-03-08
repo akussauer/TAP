@@ -3,12 +3,17 @@ name = "tap"
 version = "0.1.0"
 description = "A Teaching analysis program"
 readme = "README.md"
+authors = [
+    { name = "Alex Kussauer", email = "akussauer@gmail.com" }
+]
 requires-python = ">=3.12"
 dependencies = [
+    "cx-freeze>=8.6.0",
     "markdown>=3.10.2",
-    "pandas>=3.0.1",
+    "matplotlib>=3.10.8",
     "pdfkit>=1.0.0",
     "platformdirs>=4.9.2",
     "pyenchant>=3.3.0",
     "pyside6>=6.10.2",
+    "seaborn>=0.13.2",
 ]

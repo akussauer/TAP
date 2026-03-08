@@ -19,6 +19,7 @@ from Widgets.subject_widget import SubjectWidget
 from Widgets.subject_navigator import SubjectNavigator
 
 from Functions.FileFunctions import FunctionsFile
+from Functions.Plotter import Plotter
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -39,6 +40,7 @@ class MainWindow(QMainWindow):
         # External helpers 
         self.file_func = FunctionsFile(parent=self)
         self.configs = self.file_func.get_configs()
+        self.plotter = Plotter(file_func=self.file_func)
 
         # Lesson-level timer
         self.timer_running = False
@@ -165,6 +167,8 @@ class MainWindow(QMainWindow):
             lambda text, w=widget: self._on_title_changed(w, text)
         )
 
+        widget.timer_reset_requested.connect(self._on_subject_timer_reset)
+
         return widget
 
     def _add_subject_widget(self, label: str = "") -> SubjectWidget:
@@ -216,6 +220,14 @@ class MainWindow(QMainWindow):
         self.timer_stop()
         self.timer_time = 0
         self.ui.LCDDisplay_lesson.display("00:00:00")
+        for widget in self._subject_widgets:
+            widget._elapsed_seconds = 0
+            widget._update_lcd()
+
+    def _on_subject_timer_reset(self, discarded_seconds: int) -> None:
+        """Subtract the reset subject's discarded seconds from the lesson timer."""
+        self.timer_time = max(0, self.timer_time - discarded_seconds)
+        self.ui.LCDDisplay_lesson.display(self._fmt_time(self.timer_time))
 
     def timer_tick(self) -> None:
         self.timer_time += 1
@@ -529,6 +541,27 @@ class MainWindow(QMainWindow):
     th { background: #f4f4f4; }
     """
 
+    def _render_breakdown_html(self) -> str:
+        lesson = self._build_lesson_dict()
+        subjects = lesson["subjects"]
+
+        pie_uri = self.plotter.build_pie_uri(subjects)
+        bar_uri = self.plotter.build_bar_uri(subjects)
+        if not pie_uri and not bar_uri:
+            return ""
+
+        parts = [
+            '<div class="breakdown" style="page-break-after:always;">',
+            '<h2>Lesson Breakdown</h2>',
+            '<div class="charts" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;">',
+        ]
+        if pie_uri:
+            parts.append(f'<img src="{pie_uri}" alt="Time by Subject" style="max-height:320px;">')
+        if bar_uri:
+            parts.append(f'<img src="{bar_uri}" alt="Time by Session Type" style="max-height:320px;">')
+        parts += ['</div>', '</div>']
+        return '\n'.join(parts)
+
     def _render_subjects_html(self) -> str:
         blocks = []
         for subj in self._build_lesson_dict()["subjects"]:
@@ -553,11 +586,13 @@ class MainWindow(QMainWindow):
     def _build_full_html(self) -> str:
         lesson = self._build_lesson_dict()
         title  = lesson["lesson_name"] or "Untitled Lesson"
+        breakdown = self._render_breakdown_html()
         return (
             f'<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
             f'<style>{self._HTML_CSS}</style></head><body>'
             f'<h1>{title}</h1>'
             f'<p class="meta">Total lesson time: {lesson["lesson_time"]}</p>'
+            f'{breakdown}'
             f'{self._render_subjects_html()}'
             f'</body></html>'
         )
@@ -565,14 +600,6 @@ class MainWindow(QMainWindow):
     def export_to_markdown(self) -> None:
         lesson = self._build_lesson_dict()
         title  = lesson["lesson_name"] or "Untitled"
-        lines  = [f"# {title}", f"**Total time:** {lesson['lesson_time']}", ""]
-        for subj in lesson["subjects"]:
-            elapsed = self._fmt_time(subj.get("elapsed_seconds", 0))
-            lines += [
-                f"## {subj.get('title') or 'Untitled Subject'}",
-                f"**Session:** {subj.get('session_type', '')} | **Time:** {elapsed}",
-                "", subj.get("content", ""), "",
-            ]
 
         save_path, _ = QFileDialog.getSaveFileName(
             self, "Export Markdown",
@@ -581,6 +608,29 @@ class MainWindow(QMainWindow):
         )
         if not save_path:
             return
+
+        # Generate chart images alongside the markdown file
+        base = os.path.splitext(save_path)[0]
+        subjects = lesson["subjects"]
+
+        breakdown_lines = ["## Lesson Breakdown", ""]
+        pie_path = base.replace(" ", "_").replace("'", "") + "_pie.png"
+        if self.plotter.save_pie(subjects, pie_path):
+            breakdown_lines += [f"![Time by Subject]({os.path.basename(pie_path)})", ""]
+        bar_path = base.replace(" ", "_").replace("'", "") + "_bar.png"
+        if self.plotter.save_bar(subjects, bar_path):
+            breakdown_lines += [f"![Time by Session Type]({os.path.basename(bar_path)})", ""]
+        breakdown_lines.append("")
+
+        lines = [f"# {title}", f"**Total time:** {lesson['lesson_time']}", ""] + breakdown_lines
+        for subj in subjects:
+            elapsed = self._fmt_time(subj.get("elapsed_seconds", 0))
+            lines += [
+                f"## {subj.get('title') or 'Untitled Subject'}",
+                f"**Session:** {subj.get('session_type', '')} | **Time:** {elapsed}",
+                "", subj.get("content", ""), "",
+            ]
+
         try:
             with open(save_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines))

@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QComboBox, QGridLayout, QLabel, QLCDNumber, QLineEdit,
@@ -6,6 +6,9 @@ from PySide6.QtWidgets import (
     )
 
 class SubjectWidget(QWidget):
+    # Emitted when the subject timer is reset; carries the seconds that were discarded
+    timer_reset_requested = Signal(int)
+
     DEFAULT_SESSION_TYPES = [
         "Lecture", "Exercise", "Discussion",
         "Break", "Demo", "Group Work",
@@ -149,9 +152,14 @@ class SubjectWidget(QWidget):
             self.start_timer()
 
     def reset_timer(self) -> None:
-        # Reset elapsed time to zero; running state is unchanged.
+        """Reset elapsed time to zero; running state is unchanged.
+        Emits timer_reset_requested with the discarded seconds so the lesson
+        timer can stay in sync."""
+        discarded = self._elapsed_seconds
         self._elapsed_seconds = 0
         self._update_lcd()
+        if discarded:
+            self.timer_reset_requested.emit(discarded)
 
     def _tick(self) -> None:
         self._elapsed_seconds += 1
