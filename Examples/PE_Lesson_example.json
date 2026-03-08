@@ -1,0 +1,111 @@
+{
+    "lesson_name": "Introduction to Cardiovascular Fitness",
+    "lesson_time": "00:47:30",
+    "lesson_elapsed_seconds": 2850,
+    "subjects": [
+        {
+            "title": "Welcome & Lesson Overview",
+            "session_type": "Lecture",
+            "content": "### Welcome to PE!\n\nToday we'll be focusing on **cardiovascular fitness** — what it is, why it matters, and how to improve it.\n\n#### Today's Goals:\n1. Understand what cardiovascular fitness means\n2. Complete a warm-up routine\n3. Learn and practice interval training\n4. Cool down safely\n5. Reflect on the session as a group\n\n> Make sure you have water and appropriate footwear before we begin!",
+            "elapsed_seconds": 180,
+            "timer_was_running": false,
+            "index": 0
+        },
+        {
+            "title": "What is Cardiovascular Fitness?",
+            "session_type": "Lecture",
+            "content": "### Cardiovascular Fitness\n\nCardiovascular fitness refers to the **ability of the heart, lungs, and blood vessels** to deliver oxygen to working muscles during sustained physical activity.\n\n#### Key Terms:\n- **Heart Rate** — beats per minute (BPM)\n- **Aerobic Exercise** — activity that raises your heart rate for an extended period\n- **VO2 Max** — the maximum rate of oxygen your body can use\n\n#### Why does it matter?\n- Reduces risk of heart disease\n- Improves energy levels\n- Supports mental health\n- Increases endurance",
+            "elapsed_seconds": 240,
+            "timer_was_running": false,
+            "index": 1
+        },
+        {
+            "title": "Checking Resting Heart Rate",
+            "session_type": "Demo",
+            "content": "### Demo: Finding Your Pulse\n\nBefore we get moving, let's establish your **resting heart rate (RHR)**.\n\n#### How to find your pulse:\n1. Place two fingers on the inside of your wrist (radial pulse) **or** the side of your neck (carotid pulse)\n2. Count the beats for **30 seconds**\n3. Multiply by 2 to get your BPM\n\n#### Average Resting Heart Rates:\n| Age Group | Average RHR |\n|-----------|-------------|\n| Children (6–15) | 70–100 BPM |\n| Adults (18+) | 60–100 BPM |\n| Athletes | 40–60 BPM |\n\n> Write down your RHR — we'll compare it after the workout!",
+            "elapsed_seconds": 210,
+            "timer_was_running": false,
+            "index": 2
+        },
+        {
+            "title": "Dynamic Warm-Up",
+            "session_type": "Exercise",
+            "content": "### Dynamic Warm-Up (5 Minutes)\n\nLet's get the body ready! Follow along with each exercise:\n\n#### Circuit (45 sec each):\n1. **Jogging on the spot**\n2. **Arm circles** — forward then backward\n3. **High knees**\n4. **Leg swings** — front/back and side-to-side\n5. **Butt kicks**\n6. **Hip rotations**\n\n> Focus on controlled movements — this is a *warm-up*, not a race!",
+            "elapsed_seconds": 300,
+            "timer_was_running": false,
+            "index": 3
+        },
+        {
+            "title": "Interval Training Explained",
+            "session_type": "Lecture",
+            "content": "### What is Interval Training?\n\n**Interval training** alternates between periods of high-intensity effort and lower-intensity recovery.\n\n#### Today's Format — HIIT (High-Intensity Interval Training):\n- **Work period:** 40 seconds\n- **Rest period:** 20 seconds\n- **Rounds:** 3 sets of the full circuit\n\n#### Benefits:\n- Burns more calories in less time\n- Improves aerobic *and* anaerobic fitness\n- Keeps things interesting!\n\n> Aim to work at **70–85% of your maximum effort** during work periods.",
+            "elapsed_seconds": 180,
+            "timer_was_running": false,
+            "index": 4
+        },
+        {
+            "title": "HIIT Circuit Demo",
+            "session_type": "Demo",
+            "content": "### Demo: Full Circuit Walkthrough\n\nBefore we go full speed, I'll demonstrate each exercise so everyone knows the correct form.\n\n#### The 5 Exercises:\n1. **Jumping Jacks** — arms and legs together\n2. **Squat Jumps** — land softly, knees tracking over toes\n3. **Mountain Climbers** — keep hips level\n4. **Push-Ups** — modify on knees if needed\n5. **Burpees** — step version available as a modification\n\n> Modifications are always available — listen to your body!",
+            "elapsed_seconds": 210,
+            "timer_was_running": false,
+            "index": 5
+        },
+        {
+            "title": "HIIT Circuit — Round 1",
+            "session_type": "Exercise",
+            "content": "### Round 1 — Let's Go! \n\nComplete each exercise for **40 seconds**, then rest for **20 seconds** before moving on.\n\n1. Jumping Jacks\n2. Squat Jumps\n3. Mountain Climbers\n4. Push-Ups\n5. Burpees\n\n> Push yourself — but stay in control of your movements!",
+            "elapsed_seconds": 300,
+            "timer_was_running": false,
+            "index": 6
+        },
+        {
+            "title": "Water Break",
+            "session_type": "Break",
+            "content": "### Water Break — 2 Minutes\n\nTake this time to:\n- **Hydrate** — take a good drink of water\n- **Catch your breath**\n- Walk around slowly to keep blood circulating\n\n> We'll start Round 2 in 2 minutes!",
+            "elapsed_seconds": 120,
+            "timer_was_running": false,
+            "index": 7
+        },
+        {
+            "title": "HIIT Circuit — Rounds 2 & 3",
+            "session_type": "Exercise",
+            "content": "### Rounds 2 & 3 — Keep It Up!\n\nSame format as Round 1. **40 sec on / 20 sec rest.**\n\n#### Round 2:\n1. Jumping Jacks → Squat Jumps → Mountain Climbers → Push-Ups → Burpees\n\n#### Short Rest (60 sec)\n\n#### Round 3:\n1. Jumping Jacks → Squat Jumps → Mountain Climbers → Push-Ups → Burpees\n\n> Final round — give it everything you've got!",
+            "elapsed_seconds": 480,
+            "timer_was_running": false,
+            "index": 8
+        },
+        {
+            "title": "Cool-Down Stretching",
+            "session_type": "Exercise",
+            "content": "### Cool-Down — Static Stretching (5 Minutes)\n\nSlowly bring your heart rate down with these **held stretches** (30 sec each):\n\n1. **Standing quad stretch** — hold ankle, balance on one foot\n2. **Hamstring stretch** — seated or standing toe touch\n3. **Hip flexor lunge stretch** — deep lunge, back knee down\n4. **Chest opener** — clasp hands behind back, open chest\n5. **Shoulder cross-body stretch**\n6. **Child's pose** — hold for 60 seconds to finish\n\n> Breathe deeply through each stretch. Never bounce — hold steady.",
+            "elapsed_seconds": 300,
+            "timer_was_running": false,
+            "index": 9
+        },
+        {
+            "title": "Heart Rate Check & Reflection",
+            "session_type": "Discussion",
+            "content": "### Post-Workout Check-In\n\nLet's take our pulse again and compare to our resting heart rate from earlier.\n\n#### Discussion Questions:\n- How does your heart rate now compare to your resting rate?\n- Which exercise did you find most challenging? Why?\n- How does your body *feel* after the session?\n- What would you do differently next time?\n\n> Share with a partner first, then we'll open it up to the group.",
+            "elapsed_seconds": 180,
+            "timer_was_running": false,
+            "index": 10
+        },
+        {
+            "title": "Partner Fitness Goal Setting",
+            "session_type": "Group work",
+            "content": "### Setting a Fitness Goal\n\nWith a partner, use the **SMART goal framework** to set one fitness goal for the next 2 weeks.\n\n#### SMART Goals:\n| Letter | Meaning | Example |\n|--------|---------|----------|\n| **S** | Specific | \"I will run 3x per week\" |\n| **M** | Measurable | \"For 20 minutes each time\" |\n| **A** | Achievable | \"Starting with a walk/run mix\" |\n| **R** | Relevant | \"To improve my 1-mile time\" |\n| **T** | Time-bound | \"Over the next 2 weeks\" |\n\n> Write your goal down — you'll review it at our next session!",
+            "elapsed_seconds": 150,
+            "timer_was_running": false,
+            "index": 11
+        },
+        {
+            "title": "Wrap-Up & Dismissal",
+            "session_type": "Lecture",
+            "content": "### Great Work Today! \n\n#### What We Covered:\n- [X] Cardiovascular fitness fundamentals\n- [X] Resting heart rate measurement\n- [X] Dynamic warm-up techniques\n- [X] HIIT interval training (3 rounds!)\n- [X] Safe cool-down and stretching\n- [X] SMART goal setting\n\n#### For Next Class:\n- Bring your written SMART goal\n- Try to do **one active activity** before we meet again\n- Optional: track your steps or active minutes\n\n> See you next time — keep moving! ",
+            "elapsed_seconds": 180,
+            "timer_was_running": false,
+            "index": 12
+        }
+    ]
+}
