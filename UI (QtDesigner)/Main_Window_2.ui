@@ -544,6 +544,7 @@
      <addaction name="action_Markdown"/>
      <addaction name="action_HTML"/>
      <addaction name="action_PDF"/>
+     <addaction name="actionDOCX"/>
     </widget>
     <addaction name="action_New"/>
     <addaction name="action_Open"/>
@@ -626,6 +627,11 @@
   <action name="actionSave_2">
    <property name="text">
     <string>Save</string>
+   </property>
+  </action>
+  <action name="actionDOCX">
+   <property name="text">
+    <string>DOCX</string>
    </property>
   </action>
  </widget>

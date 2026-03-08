@@ -4,6 +4,9 @@ import re
 import pdfkit
 import markdown as md_converter
 
+from docx import Document
+from docx.shared import Inches
+
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -110,6 +113,7 @@ class MainWindow(QMainWindow):
         self.ui.action_Markdown.triggered.connect(self.export_to_markdown)
         self.ui.action_PDF.triggered.connect(self.export_to_pdf)
         self.ui.action_HTML.triggered.connect(self.save_as_html)
+        self.ui.actionDOCX.triggered.connect(self.export_to_docx)
         self.ui.actionSettings.triggered.connect(self.open_settings)
 
         self._setup_hotkeys()
@@ -553,7 +557,7 @@ class MainWindow(QMainWindow):
         parts = [
             '<div class="breakdown" style="page-break-after:always;">',
             '<h2>Lesson Breakdown</h2>',
-            '<div class="charts" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;">',
+            '<div class="charts" style="display:flex;flex-direction:column;align-items:center;gap:24px;">',
         ]
         if pie_uri:
             parts.append(f'<img src="{pie_uri}" alt="Time by Subject" style="max-height:320px;">')
@@ -677,3 +681,79 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         dialog = SettingsDialog(self, file_func=self.file_func)
         dialog.exec()
+
+    ## DOCX export
+    def export_to_docx(self) -> None:
+        lesson = self._build_lesson_dict()
+        title  = lesson["lesson_name"] or "Untitled"
+
+        save_path, _ = QFileDialog.getSaveFileName(
+            self, "Export DOCX",
+            os.path.join(self.file_func.downloads_path, f"{title}.docx"),
+            "Word Documents (*.docx)",
+        )
+        if not save_path:
+            return
+
+        subjects = lesson["subjects"]
+        doc = Document()
+
+        # Title & meta
+        doc.add_heading(title, 0)
+        doc.add_paragraph(f"Total lesson time: {lesson['lesson_time']}")
+
+        # Breakdown section
+        doc.add_page_break()
+        doc.add_heading("Lesson Breakdown", 1)
+        pie_stream = self.plotter.build_pie_stream(subjects)
+        if pie_stream:
+            doc.add_picture(pie_stream, width=Inches(5))
+        bar_stream = self.plotter.build_bar_stream(subjects)
+        if bar_stream:
+            doc.add_picture(bar_stream, width=Inches(5))
+
+        # Subject sections
+        doc.add_page_break()
+        for subj in subjects:
+            elapsed = self._fmt_time(subj.get("elapsed_seconds", 0))
+            doc.add_heading(subj.get("title") or "Untitled Subject", 1)
+            meta_p = doc.add_paragraph()
+            meta_run = meta_p.add_run(f"{subj.get('session_type', '')} | Time: {elapsed}")
+            meta_run.italic = True
+            self._docx_add_markdown(doc, subj.get("content", ""))
+
+        try:
+            doc.save(save_path)
+        except OSError as e:
+            QMessageBox.critical(self, "Export Failed", f"Could not write file:\n{e}")
+
+    def _docx_add_markdown(self, doc: Document, text: str) -> None:
+        """Append markdown content to a Document with basic structure & inline formatting."""
+        for line in text.splitlines():
+            stripped = line.rstrip()
+            if not stripped:
+                continue
+            if stripped.startswith('### '):
+                doc.add_heading(stripped[4:], level=3)
+            elif stripped.startswith('## '):
+                doc.add_heading(stripped[3:], level=2)
+            elif stripped.startswith('# '):
+                doc.add_heading(stripped[2:], level=1)
+            elif re.match(r'^[-*•]\s', stripped):
+                self._docx_add_inline(doc.add_paragraph(style='List Bullet'), stripped[2:])
+            elif re.match(r'^\d+\.\s', stripped):
+                self._docx_add_inline(doc.add_paragraph(style='List Number'),
+                                      re.sub(r'^\d+\.\s', '', stripped))
+            else:
+                self._docx_add_inline(doc.add_paragraph(), stripped)
+
+    @staticmethod
+    def _docx_add_inline(para, text: str) -> None:
+        """Write text into a paragraph run, handling **bold** and *italic* markers."""
+        for part in re.split(r'(\*\*[^*]+\*\*|\*[^*]+\*)', text):
+            if part.startswith('**') and part.endswith('**') and len(part) > 4:
+                para.add_run(part[2:-2]).bold = True
+            elif part.startswith('*') and part.endswith('*') and len(part) > 2:
+                para.add_run(part[1:-1]).italic = True
+            else:
+                para.add_run(part)

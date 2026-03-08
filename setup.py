@@ -3,13 +3,16 @@ import sys
 
 build_options = {
     'packages': [
-        "PySide6",
+        "PySide6.QtCore",
+        "PySide6.QtGui", 
+        "PySide6.QtWidgets",
         "seaborn",
         "matplotlib",
         "platformdirs",
         "pdfkit",
         "markdown",
         "enchant", # pyenchant is a dependency of markdown-it-py, which is used for spellchecking in the Notes page
+        "docx" # python-docx is used for DOCX report generation
     ],
     'excludes': ['tkinter'],
     'include_files': [

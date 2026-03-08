@@ -14,7 +14,7 @@ class Plotter:
 
     ## Base64 data-URI API (for HTML / PDF)
     def build_pie_uri(self, subjects: list[dict]) -> str | None:
-        """Return a PNG data-URI pie chart of subject time distribution, or None."""
+        # Return a PNG data-URI pie chart of subject time distribution, or None.
         fig = self._make_pie_fig(subjects)
         if fig is None:
             return None
@@ -30,6 +30,25 @@ class Plotter:
         uri = self._fig_to_data_uri(fig)
         plt.close(fig)
         return uri
+
+    ## BytesIO stream API (for DOCX)
+    def build_pie_stream(self, subjects: list[dict]) -> io.BytesIO | None:
+        # Return a PNG BytesIO stream for the pie chart, or None.
+        fig = self._make_pie_fig(subjects)
+        if fig is None:
+            return None
+        buf = self._fig_to_bytesio(fig)
+        plt.close(fig)
+        return buf
+
+    def build_bar_stream(self, subjects: list[dict]) -> io.BytesIO | None:
+        """Return a PNG BytesIO stream for the bar chart, or None."""
+        fig = self._make_bar_fig(subjects)
+        if fig is None:
+            return None
+        buf = self._fig_to_bytesio(fig)
+        plt.close(fig)
+        return buf
 
     ## File-save API (for Markdown)
 
@@ -52,9 +71,24 @@ class Plotter:
         return True
 
     # Shared style constants
-    _FIG_SIZE   = (6, 5)        # identical canvas size for both charts
-    _FONT_SIZE  = 11            # base font size used everywhere
-    _PALETTE    = 'Set2'       # named palette for bar colours
+    _BASE_SIZE  = 6.0       # base figure dimension in inches
+    _FONT_SIZE  = 11        # base font size used everywhere
+    _PALETTE    = 'Set2'    # named palette for colours
+
+    def _pie_figsize(self, n: int) -> tuple[float, float]:
+        """Grow the pie canvas by 0.6" per slice beyond 4, capped at 12"."""
+        side = min(self._BASE_SIZE + max(0, n - 4) * 0.6, 12.0)
+        return (side, side)
+
+    def _bar_figsize(self, n: int) -> tuple[float, float]:
+        """Grow the bar canvas by 0.9" per type beyond 3, capped at 14"."""
+        w = min(self._BASE_SIZE + max(0, n - 3) * 0.9, 14.0)
+        return (w, self._BASE_SIZE - 1)
+
+    def _palette_colours(self, n: int) -> list:
+        """Wrap around the palette so we never run out of colours."""
+        base = list(plt.get_cmap(self._PALETTE).colors)
+        return [base[i % len(base)] for i in range(n)]
 
     ## Figure builders
     def _make_pie_fig(self, subjects: list[dict]):
@@ -65,18 +99,30 @@ class Plotter:
         if not rows:
             return None
 
-        labels = [r[0] for r in rows]
-        values = [r[1] for r in rows]
-        colours = plt.get_cmap(self._PALETTE).colors[:len(rows)]
+        n = len(rows)
+        labels  = [r[0] for r in rows]
+        values  = [r[1] for r in rows]
+        colours = self._palette_colours(n)
+        use_legend = n > 5
 
-        fig, ax = plt.subplots(figsize=self._FIG_SIZE)
+        fig, ax = plt.subplots(figsize=self._pie_figsize(n))
         ax.pie(
-            values, labels=labels, colors=colours,
-            autopct='%1.1f%%', startangle=140,
+            values,
+            labels=None if use_legend else labels,
+            colors=colours,
+            autopct='%1.1f%%',
+            startangle=140,
             textprops={'fontsize': self._FONT_SIZE},
         )
         ax.axis('equal')
         ax.set_title('Time Distribution by Subject', fontsize=self._FONT_SIZE + 1, fontweight='bold')
+        if use_legend:
+            ax.legend(
+                labels, loc='lower center',
+                bbox_to_anchor=(0.5, -0.08),
+                ncol=min(3, (n + 1) // 2),
+                fontsize=self._FONT_SIZE - 1,
+            )
         fig.tight_layout()
         return fig
 
@@ -89,12 +135,12 @@ class Plotter:
         if not type_minutes:
             return None
 
-        types = list(type_minutes.keys())
+        types   = list(type_minutes.keys())
         minutes = [type_minutes[t] for t in types]
-        colours = plt.get_cmap(self._PALETTE).colors[:len(types)]
+        colours = self._palette_colours(len(types))
 
-        fig, ax = plt.subplots(figsize=self._FIG_SIZE)
-        sns.barplot(x=types, y=minutes, ax=ax, hue=types, palette=colours)
+        fig, ax = plt.subplots(figsize=self._bar_figsize(len(types)))
+        sns.barplot(x=types, y=minutes, ax=ax, hue=types, palette=colours, legend=False)
         ax.set_title('Time by Session Type', fontsize=self._FONT_SIZE + 1, fontweight='bold')
         ax.set_xlabel('Session Type', fontsize=self._FONT_SIZE)
         ax.set_ylabel('Time (minutes)', fontsize=self._FONT_SIZE)
@@ -104,9 +150,14 @@ class Plotter:
 
     ## Internal utilities
     @staticmethod
-    def _fig_to_data_uri(fig) -> str:
+    def _fig_to_bytesio(fig) -> io.BytesIO:
         buf = io.BytesIO()
         fig.savefig(buf, format='png', dpi=120, bbox_inches='tight')
         buf.seek(0)
+        return buf
+
+    @staticmethod
+    def _fig_to_data_uri(fig) -> str:
+        buf = Plotter._fig_to_bytesio(fig)
         b64 = base64.b64encode(buf.read()).decode('ascii')
         return f"data:image/png;base64,{b64}"
