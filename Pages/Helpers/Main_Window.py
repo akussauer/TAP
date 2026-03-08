@@ -1,39 +1,24 @@
-# -*- coding: utf-8 -*-
-"""
-main_window.py
---------------
-Lesson controller.  Layout:
-  Left  →  SubjectNavigator  (replaces SubjectPlaceholder, max 200px)
-  Right →  QStackedWidget    (one page per SubjectWidget, shown one at a time)
-
-Subjects are always fully editable — no freeze/unfreeze logic.
-The navigator's bold highlight is the only indicator of which subject is current.
-"""
-
 import json
 import os
 import re
-
 import pdfkit
 import markdown as md_converter
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QFileDialog,
-    QMainWindow,
-    QMessageBox,
-    QStackedWidget,
-    QWidget,
-)
+    QFileDialog, QMainWindow, QMessageBox, QStackedWidget,
+    QWidget
+    )
 
 from Pages.UI.ui_Main_Window import Ui_Main_Window
 from Pages.Helpers.Settings_Dialog import SettingsDialog
+
 from Widgets.md_highlighter import MarkdownHighlighter
 from Widgets.subject_widget import SubjectWidget
 from Widgets.subject_navigator import SubjectNavigator
-from Functions.FileFunctions import FunctionsFile
 
+from Functions.FileFunctions import FunctionsFile
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -51,37 +36,34 @@ class MainWindow(QMainWindow):
         ):
             w.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        # ── External helpers ──────────────────────────────────────────
+        # External helpers 
         self.file_func = FunctionsFile(parent=self)
         self.configs = self.file_func.get_configs()
 
-        # ── Lesson-level timer ────────────────────────────────────────
+        # Lesson-level timer
         self.timer_running = False
         self.timer_time = 0
         self.qt_timer = QTimer(self)
         self.qt_timer.setInterval(1000)
         self.qt_timer.timeout.connect(self.timer_tick)
 
-        # ── Subject management ────────────────────────────────────────
+        # Subject management
         self._subject_widgets: list[SubjectWidget] = []
         self._active_index: int = 0
         self._current_file_path: str | None = None   # set after save/open
 
-        # ── Replace placeholder widgets ───────────────────────────────
+        # Replace placeholder widgets
         self._setup_navigator()
         self._setup_stacked_area()
 
-        # ── First blank subject ───────────────────────────────────────
+        # First blank subject
         self._add_subject_widget(label="Subject 1")
 
-        # ── Wiring ───────────────────────────────────────────────────
+        # Connect signals
         self.connect_signals()
         self.ui.LCDDisplay_lesson.display(self._fmt_time(0))
 
-    # ══════════════════════════════════════════════════════════════════
-    # Layout setup
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Layout setup
     def _setup_navigator(self) -> None:
         placeholder = self.ui.SubjectPlaceholder
         parent_layout = self.ui.gridLayout_12
@@ -108,10 +90,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget(self.ui.ContainerLesson)
         parent_layout.addWidget(self.stack, row, col, rowspan, colspan)
 
-    # ══════════════════════════════════════════════════════════════════
-    # Signal connections
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Signal connections
     def connect_signals(self) -> None:
         self.ui.PBPPlayLesson.clicked.connect(self.StartStopTimer)
         self.ui.PBResetLesson.clicked.connect(self.timer_reset)
@@ -141,14 +120,12 @@ class MainWindow(QMainWindow):
         "Hotkeys": {
             "new_subject":      "Ctrl+N",
             "lesson_timer":     "Ctrl+T",
-            "subject_timer":    "Ctrl+Shift+T",
             "save":             "Ctrl+S"
         }
         """
         defaults = {
             "new_subject":   "Ctrl+N",
             "lesson_timer":  "Ctrl+T",
-            "subject_timer": "Ctrl+Shift+T",
             "save":          "Ctrl+S",
             "open":          "Ctrl+O",
         }
@@ -157,7 +134,6 @@ class MainWindow(QMainWindow):
         actions = {
             "new_subject":   self.on_new_subject,
             "lesson_timer":  self.StartStopTimer,
-            "subject_timer": self._toggle_active_subject_timer,
             "save":          self.save_lesson,
             "open":          self.on_action_open,
         }
@@ -195,6 +171,10 @@ class MainWindow(QMainWindow):
         return widget
 
     def _add_subject_widget(self, label: str = "") -> SubjectWidget:
+        # Stop the current subject's timer before switching away from it
+        if self.timer_running and self._subject_widgets:
+            self._subject_widgets[self._active_index].stop_timer()
+
         widget = self._make_subject_widget()
         logical_index = len(self._subject_widgets)
 
@@ -208,6 +188,10 @@ class MainWindow(QMainWindow):
         QWidget.setTabOrder(self.ui.LELessonName, widget.le_title)
         QWidget.setTabOrder(widget.le_title, widget.cb_session)
         QWidget.setTabOrder(widget.cb_session, widget.te_content)
+
+        # Start the new subject's timer if the lesson is running
+        if self.timer_running:
+            widget.start_timer()
 
         return widget
 
@@ -225,11 +209,15 @@ class MainWindow(QMainWindow):
         self.timer_running = True
         self.qt_timer.start()
         self.ui.PBPPlayLesson.setText("Pause")
+        if self._subject_widgets:
+            self._subject_widgets[self._active_index].start_timer()
 
     def timer_stop(self) -> None:
         self.timer_running = False
         self.qt_timer.stop()
         self.ui.PBPPlayLesson.setText("Play")
+        if self._subject_widgets:
+            self._subject_widgets[self._active_index].stop_timer()
 
     def timer_reset(self) -> None:
         self.timer_stop()
@@ -240,15 +228,7 @@ class MainWindow(QMainWindow):
         self.timer_time += 1
         self.ui.LCDDisplay_lesson.display(self._fmt_time(self.timer_time))
 
-    def _toggle_active_subject_timer(self) -> None:
-        """Ctrl+Shift+T — toggle the timer on whichever subject is currently shown."""
-        if self._subject_widgets:
-            self._subject_widgets[self._active_index].toggle_timer()
-
-    # ══════════════════════════════════════════════════════════════════
-    # Subject management slots
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Subject management slots
     def on_new_subject(self) -> None:
         count = len(self._subject_widgets)
         self._add_subject_widget(label=f"Subject {count + 1}")
@@ -256,12 +236,18 @@ class MainWindow(QMainWindow):
     def _on_navigator_select(self, logical_index: int) -> None:
         if logical_index < 0 or logical_index >= len(self._subject_widgets):
             return
+        # Stop the previously active subject timer when switching
+        if self.timer_running and logical_index != self._active_index:
+            self._subject_widgets[self._active_index].stop_timer()
         self._active_index = logical_index
         widget = self._subject_widgets[logical_index]
         self.stack.setCurrentWidget(widget)
         QWidget.setTabOrder(self.ui.LELessonName, widget.le_title)
         QWidget.setTabOrder(widget.le_title, widget.cb_session)
         QWidget.setTabOrder(widget.cb_session, widget.te_content)
+        # Start the newly focused subject's timer if the lesson is running
+        if self.timer_running:
+            widget.start_timer()
 
     def _on_title_changed(self, widget: SubjectWidget, text: str) -> None:
         try:
@@ -286,6 +272,10 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Cannot Delete", "A lesson must have at least one subject.")
             return
 
+        # Stop the active subject's timer before removing it
+        if self.timer_running and logical_index == self._active_index:
+            self._subject_widgets[logical_index].stop_timer()
+
         widget = self._subject_widgets.pop(logical_index)
         self.stack.removeWidget(widget)
         widget.deleteLater()
@@ -294,6 +284,10 @@ class MainWindow(QMainWindow):
         self._active_index = min(self._active_index, len(self._subject_widgets) - 1)
         self.stack.setCurrentWidget(self._subject_widgets[self._active_index])
         self.navigator.set_active_index(self._active_index)
+
+        # Start the replacement subject's timer if the lesson is running
+        if self.timer_running:
+            self._subject_widgets[self._active_index].start_timer()
 
     def on_end_lesson(self) -> None:
         reply = QMessageBox.question(
@@ -305,10 +299,7 @@ class MainWindow(QMainWindow):
         self.timer_stop()
         self.save_lesson()
 
-    # ══════════════════════════════════════════════════════════════════
-    # Data aggregation
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Data aggregation
     def _build_lesson_dict(self) -> dict:
         subjects = []
         for i, widget in enumerate(self._subject_widgets):
@@ -323,10 +314,7 @@ class MainWindow(QMainWindow):
             "subjects": subjects,
         }
 
-    # ══════════════════════════════════════════════════════════════════
-    # Persist / load
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Persist / load
     def save_lesson(self) -> None:
         """
         Save to the current file path if one exists (i.e. previously saved/opened),
@@ -364,7 +352,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Save Failed", f"Could not save file:\n{e}")
 
     def on_action_open(self) -> None:
-        """Prompt for a .json lesson file, offer to save current work first."""
+        # Prompt for a .json lesson file, offer to save current work first.
         has_content = len(self._subject_widgets) > 1 or bool(
             self._subject_widgets and self._subject_widgets[0].le_title.text()
         )
@@ -415,7 +403,7 @@ class MainWindow(QMainWindow):
         self._update_title_bar()
 
     def _update_title_bar(self) -> None:
-        """Show the open filename in the window title."""
+        # Show the open filename in the window title.
         if self._current_file_path:
             name = os.path.basename(self._current_file_path)
             self.setWindowTitle(f"{name} — Lesson Notes")
@@ -454,10 +442,7 @@ class MainWindow(QMainWindow):
         if not skip_default:
             self._add_subject_widget(label="Subject 1")
 
-    # ══════════════════════════════════════════════════════════════════
-    # Bracket auto-pairing
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Bracket auto-pairing
     def _on_text_changed(self, widget: SubjectWidget) -> None:
         te = widget.te_content
         cursor = te.textCursor()
@@ -519,10 +504,7 @@ class MainWindow(QMainWindow):
         te.setTextCursor(cursor)
         te.blockSignals(False)
 
-    # ══════════════════════════════════════════════════════════════════
-    # Export helpers
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Export helpers
     @staticmethod
     def _fmt_time(seconds: int) -> str:
         h, rem = divmod(seconds, 3600)
@@ -643,10 +625,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", f"Could not write PDF:\n{e}")
 
-    # ══════════════════════════════════════════════════════════════════
-    # Settings dialog
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Settings dialog
     def open_settings(self):
         dialog = SettingsDialog(self, file_func=self.file_func)
         dialog.exec()

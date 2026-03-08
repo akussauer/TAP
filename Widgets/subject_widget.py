@@ -1,17 +1,9 @@
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QComboBox,
-    QGridLayout,
-    QLabel,
-    QLCDNumber,
-    QLineEdit,
-    QPushButton,
-    QSizePolicy,
-    QTextEdit,
-    QWidget,
-)
-
+    QComboBox, QGridLayout, QLabel, QLCDNumber, QLineEdit,
+    QPushButton, QSizePolicy, QTextEdit, QWidget,
+    )
 
 class SubjectWidget(QWidget):
     DEFAULT_SESSION_TYPES = [
@@ -31,9 +23,7 @@ class SubjectWidget(QWidget):
 
         self._build_ui(session_types or self.DEFAULT_SESSION_TYPES)
 
-    # ──────────────────────────────────────────────────────────────────
-    # UI
-    # ──────────────────────────────────────────────────────────────────
+    ## UI
 
     def _build_ui(self, session_types: list) -> None:
         root = QGridLayout(self)
@@ -43,7 +33,7 @@ class SubjectWidget(QWidget):
 
         sp_max = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
 
-        # ── Top bar ────────────────────────────────────────────────────
+        # Top bar
         top = QWidget(self)
         top_layout = QGridLayout(top)
         top_layout.setContentsMargins(0, 0, 0, 0)
@@ -118,22 +108,17 @@ class SubjectWidget(QWidget):
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(0)
 
-        self.btn_play = QPushButton("Play", btn_container)
-        self.btn_play.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.btn_play.clicked.connect(self.toggle_timer)
-        btn_layout.addWidget(self.btn_play, 0, 0, 1, 1)
-
         self.btn_reset = QPushButton("Reset", btn_container)
         self.btn_reset.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_reset.clicked.connect(self.reset_timer)
-        btn_layout.addWidget(self.btn_reset, 1, 0, 1, 1)
+        btn_layout.addWidget(self.btn_reset, 0, 0, 1, 1)
 
         timer_layout.addWidget(btn_container, 0, 1, 1, 1)
         top_layout.addWidget(timer_container, 0, 1, 1, 1)
 
         root.addWidget(top, 0, 0, 1, 1)
 
-        # ── Notes text-edit ────────────────────────────────────────────
+        # Notes text-edit
         self.te_content = QTextEdit(self)
         font_te = QFont()
         font_te.setPointSize(12)
@@ -146,26 +131,27 @@ class SubjectWidget(QWidget):
         )
         root.addWidget(self.te_content, 1, 0, 1, 1)
 
-    # ──────────────────────────────────────────────────────────────────
-    # Timer
-    # ──────────────────────────────────────────────────────────────────
+    ## Timer
+    def start_timer(self) -> None:
+        if not self._timer_running:
+            self._qt_timer.start()
+            self._timer_running = True
 
-    def toggle_timer(self) -> None:
+    def stop_timer(self) -> None:
         if self._timer_running:
             self._qt_timer.stop()
             self._timer_running = False
-            self.btn_play.setText("Play")
+
+    def toggle_timer(self) -> None:
+        if self._timer_running:
+            self.stop_timer()
         else:
-            self._qt_timer.start()
-            self._timer_running = True
-            self.btn_play.setText("Pause")
+            self.start_timer()
 
     def reset_timer(self) -> None:
-        self._qt_timer.stop()
-        self._timer_running = False
+        # Reset elapsed time to zero; running state is unchanged.
         self._elapsed_seconds = 0
         self._update_lcd()
-        self.btn_play.setText("Play")
 
     def _tick(self) -> None:
         self._elapsed_seconds += 1
@@ -177,22 +163,14 @@ class SubjectWidget(QWidget):
         s = self._elapsed_seconds % 60
         self.lcd.display(f"{h:02d}:{m:02d}:{s:02d}")
 
-    # ──────────────────────────────────────────────────────────────────
-    # Serialisation
-    # ──────────────────────────────────────────────────────────────────
-
+    ## Serialisation
     def to_dict(self) -> dict:
-        was_running = self._timer_running
-        if was_running:
-            self._qt_timer.stop()
-            self._timer_running = False
-
         return {
             "title": self.le_title.text(),
             "session_type": self.cb_session.currentText(),
             "content": self.te_content.toPlainText(),
             "elapsed_seconds": self._elapsed_seconds,
-            "timer_was_running": was_running,
+            "timer_was_running": self._timer_running,
         }
 
     def from_dict(self, data: dict) -> None:
@@ -209,14 +187,7 @@ class SubjectWidget(QWidget):
         self._elapsed_seconds = int(data.get("elapsed_seconds", 0))
         self._update_lcd()
 
-        if data.get("timer_was_running", False):
-            self._qt_timer.start()
-            self._timer_running = True
-
-    # ──────────────────────────────────────────────────────────────────
-    # Properties
-    # ──────────────────────────────────────────────────────────────────
-
+    ## Properties
     @property
     def title(self) -> str:
         return self.le_title.text()

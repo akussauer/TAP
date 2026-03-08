@@ -17,7 +17,6 @@ _MARKDOWN_COLOUR = "#0E80A3" # Used for preview text in settings dialog; matches
 _HOTKEY_FIELDS = [
     ("LE_NewSubject", "new_subject"),
     ("LE_LessTimer",  "lesson_timer"),
-    ("LE_SubTimer",   "subject_timer"),
     ("LE_Save",       "save")
 ]
 
@@ -27,7 +26,6 @@ _LANG_OPTIONS = [
     'en_JM', 'en_NA', 'en_NG', 'en_NZ', 'en_PH', 'en_SG',
     'en_TT', 'en_US', 'en_ZA', 'en_ZW',
 ]
-
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, file_func=None):
@@ -43,16 +41,12 @@ class SettingsDialog(QDialog):
         self._load_current_settings()
         self._connect_signals()
 
-    # ──────────────────────────────────────────────────────────────────
-    # Setup
-    # ──────────────────────────────────────────────────────────────────
-
+    ## Setup
     def _replace_hotkey_edits(self) -> None:
         """Swap plain QLineEdits for HotkeyLineEdit instances."""
         replacements = [
             ("LE_NewSubject", self.ui.gridLayout_7),
             ("LE_LessTimer",  self.ui.gridLayout_8),
-            ("LE_SubTimer",   self.ui.gridLayout_9),
             ("LE_Save",       self.ui.gridLayout_10),
         ]
         for attr, layout in replacements:
@@ -108,10 +102,7 @@ class SettingsDialog(QDialog):
         self.ui.ButtonSave.clicked.connect(self.save_settings)
         self.ui.ButtonReset.clicked.connect(self.reset_settings)
 
-    # ──────────────────────────────────────────────────────────────────
-    # Slots
-    # ──────────────────────────────────────────────────────────────────
-
+    ## Slots
     def save_settings(self) -> None:
         settings = {
             "theme":            _THEME_OPTIONS.get(self.ui.CBTheme.currentText(), "system"),
@@ -130,10 +121,7 @@ class SettingsDialog(QDialog):
             self.file_func.reset_configs(defaults=True)
         self.accept()
 
-    # ──────────────────────────────────────────────────────────────────
-    # Helpers
-    # ──────────────────────────────────────────────────────────────────
-
+    ## Helpers
     def _read_hotkeys(self) -> dict:
         result = {}
         for ui_name, cfg_key in _HOTKEY_FIELDS:
