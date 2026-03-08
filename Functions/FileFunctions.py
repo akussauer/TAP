@@ -1,11 +1,12 @@
 import json
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 
 from PySide6.QtWidgets import QMessageBox
 
 from platformdirs import user_data_dir
 from pathlib import Path
-
 
 DEFAULT_CONFIG = {
     "theme": "system",
@@ -29,30 +30,31 @@ class FunctionsFile:
         self.downloads_path = os.path.join(Path.home(), "Downloads")
 
         self.initialize_all_paths()
+        self.setup_logging()
 
-    # ──────────────────────────────────────────────────────────────────
-    # Directory setup
-    # ──────────────────────────────────────────────────────────────────
+        # Log startup
+        self.log("Application started.")
 
+    ## Directory setup
     def create_appdata_repo(self):
         app_data_path = Path(user_data_dir("TAP", "MPS"))
         app_data_path.mkdir(parents=True, exist_ok=True)
         return str(app_data_path)
 
     def initialize_all_paths(self):
-        required_structure = ["Session Data", "Logs"]
+        required_structure = ["Logs"]
         try:
             for sub_dir in required_structure:
                 path = os.path.join(self.app_data_path, sub_dir)
                 if os.path.exists(path):
-                    if sub_dir == "Session Data":
-                        self.session_data_path = path
+                    if sub_dir == "Logs":
+                        self.log_path = path
                     continue
                 else:
                     dir_path = self.create_new_path(sub_dir)
                     os.makedirs(dir_path, exist_ok=True)
-                    if sub_dir == "Session Data":
-                        self.session_data_path = dir_path
+                    if sub_dir == "Logs":
+                        self.log_path = dir_path
 
             # Write default config if absent
             config_path = os.path.join(self.app_data_path, "config.json")
@@ -60,6 +62,8 @@ class FunctionsFile:
                 self._write_config(DEFAULT_CONFIG)
 
         except Exception as e:
+            if hasattr(self, 'log'):
+                self.log(f"Failed to initialize application paths: {e}", level="error")
             QMessageBox.critical(
                 self.parent, "Initialization Error",
                 f"An error occurred while initializing application paths: {e}"
@@ -71,11 +75,26 @@ class FunctionsFile:
         full_path = os.path.join(self.app_data_path, relative_path)
         os.makedirs(full_path, exist_ok=True)
         return full_path
+    
+    ## Logging Setup
+    def setup_logging(self):
+        if not hasattr(self, 'log_path'):
+            self.initialize_all_paths()
+        log_file = os.path.join(self.log_path, "app.log")
+        handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
 
-    # ──────────────────────────────────────────────────────────────────
-    # Config helpers
-    # ──────────────────────────────────────────────────────────────────
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        logger.addHandler(handler)
 
+    def log(self, message: str, level: str = "info") -> None:
+        logger = logging.getLogger()
+        log_method = getattr(logger, level.lower(), logger.info)
+        log_method(message)
+
+    ## Config helpers
     @property
     def _config_path(self) -> str:
         return os.path.join(self.app_data_path, "config.json")
@@ -98,6 +117,8 @@ class FunctionsFile:
             with open(self._config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError):
+            if hasattr(self, 'log'):
+                self.log("Failed to read config file; using defaults.", level="error")
             return dict(DEFAULT_CONFIG)
 
         # Merge defaults for any keys absent in the saved file
@@ -123,6 +144,7 @@ class FunctionsFile:
         try:
             self._write_config(current)
         except OSError as e:
+            self.log(f"Failed to save config: {e}", level="error")
             QMessageBox.critical(
                 self.parent, "Save Failed",
                 f"Could not save settings:\n{e}"
@@ -137,6 +159,7 @@ class FunctionsFile:
             try:
                 self._write_config(DEFAULT_CONFIG)
             except OSError as e:
+                self.log(f"Failed to reset config: {e}", level="error")
                 QMessageBox.critical(
                     self.parent, "Reset Failed",
                     f"Could not reset settings:\n{e}"

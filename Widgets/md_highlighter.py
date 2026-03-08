@@ -26,6 +26,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             self.spell = enchant.Dict(language) # Use the specified language dictionary
         except enchant.errors.DictNotFoundError:
             self.spell = None
+            self.file_func.log(f"No dictionary found for language '{language}'. Spell checking disabled.", level="warning")
             QMessageBox.Warning(self.parent, "Spell Check Warning", f"No dictionary found for language '{language}'. Spell checking will be disabled.")
 
         # Spell check format — red underline

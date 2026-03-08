@@ -1,19 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Widgets/ColourButton.py
------------------------
-A QPushButton that:
-  • Displays its current colour as a background fill
-  • Shows the hex value as the button label
-  • Opens QColorDialog on click so the user can pick a new colour
-  • Adapts the label text to black or white depending on background luminance
-    so it stays readable on any colour
-"""
-
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QColorDialog, QPushButton
-
 
 class ColourButton(QPushButton):
     # Emitted whenever the user confirms a new colour
@@ -25,10 +12,7 @@ class ColourButton(QPushButton):
         self.clicked.connect(self._open_dialog)
         self._refresh()
 
-    # ──────────────────────────────────────────────────────────────────
     # Public API
-    # ──────────────────────────────────────────────────────────────────
-
     def colour(self) -> str:
         """Return the current colour as a lowercase hex string."""
         return self._colour.name()
@@ -40,10 +24,7 @@ class ColourButton(QPushButton):
             self._colour = c
             self._refresh()
 
-    # ──────────────────────────────────────────────────────────────────
-    # Internal
-    # ──────────────────────────────────────────────────────────────────
-
+    # Internal logic
     def _open_dialog(self) -> None:
         chosen = QColorDialog.getColor(
             self._colour,

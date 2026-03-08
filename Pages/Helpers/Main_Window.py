@@ -145,10 +145,7 @@ class MainWindow(QMainWindow):
             sc.activated.connect(slot)
             self._shortcuts.append(sc)
 
-    # ══════════════════════════════════════════════════════════════════
-    # Subject factory
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Subject factory and management
     def _make_subject_widget(self) -> SubjectWidget:
         widget = SubjectWidget(parent=self)
 
@@ -192,13 +189,9 @@ class MainWindow(QMainWindow):
         # Start the new subject's timer if the lesson is running
         if self.timer_running:
             widget.start_timer()
-
         return widget
 
-    # ══════════════════════════════════════════════════════════════════
-    # Lesson timer
-    # ══════════════════════════════════════════════════════════════════
-
+    ## Lesson timer
     def StartStopTimer(self) -> None:
         if self.timer_running:
             self.timer_stop()
@@ -349,6 +342,7 @@ class MainWindow(QMainWindow):
             self._current_file_path = path
             self._update_title_bar()
         except OSError as e:
+            self.file_func.log(f"Failed to save lesson file '{path}': {e}", level="error")
             QMessageBox.critical(self, "Save Failed", f"Could not save file:\n{e}")
 
     def on_action_open(self) -> None:
@@ -385,6 +379,7 @@ class MainWindow(QMainWindow):
                 data = json.load(f)
         except (OSError, json.JSONDecodeError) as e:
             QMessageBox.critical(self, "Load Error", str(e))
+            self.file_func.log(f"Failed to load lesson file '{path}': {e}", level="error")
             return
 
         self._clear_all(skip_default=True)
@@ -590,6 +585,7 @@ class MainWindow(QMainWindow):
             with open(save_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines))
         except OSError as e:
+            self.file_func.log(f"Failed to export Markdown: {e}", level="error")
             QMessageBox.critical(self, "Export Failed", f"Could not write file:\n{e}")
 
     def save_as_html(self) -> None:
@@ -605,6 +601,7 @@ class MainWindow(QMainWindow):
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(self._build_full_html())
         except OSError as e:
+            self.file_func.log(f"Failed to save HTML: {e}", level="error")
             QMessageBox.critical(self, "Save Failed", f"Could not save file:\n{e}")
 
     def export_to_pdf(self) -> None:
@@ -623,6 +620,7 @@ class MainWindow(QMainWindow):
         try:
             pdfkit.from_string(self._build_full_html(), save_path, configuration=config, options=options)
         except Exception as e:
+            self.file_func.log(f"Failed to export PDF: {e}", level="error")
             QMessageBox.critical(self, "Export Failed", f"Could not write PDF:\n{e}")
 
     ## Settings dialog
