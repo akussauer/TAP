@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 # Import 1st page
 from Pages.Helpers.Main_Window import MainWindow
 from Functions.Appearance import apply_appearance
+from Functions.SingleInstance import InstanceServer, send_to_running_instance
 
 def load_config():
     # Get the app data path
@@ -31,6 +32,14 @@ def load_config():
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
+    # Lesson file passed on the command line (e.g. double-clicking a .tap file)
+    args = app.arguments()[1:]
+    open_path = os.path.abspath(args[0]) if args else ""
+
+    # Only one TAP at a time — hand the file to the running window and exit
+    if send_to_running_instance(open_path):
+        sys.exit(0)
+
     # System theme and style (defaults to system theme / system style without a config)
     apply_appearance(app, load_config() or {})
 
@@ -40,7 +49,10 @@ if __name__ == "__main__":
     app.setApplicationVersion("1.00")
 
     # Load the main window
-    window = MainWindow()
+    window = MainWindow(open_path=open_path or None)
     window.show()
+
+    instance_server = InstanceServer(app)
+    instance_server.message_received.connect(window.handle_external_open)
     sys.exit(app.exec())
 # Use "uv run main.py" in the terminal to launch the application for the development environment

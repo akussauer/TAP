@@ -1,4 +1,3 @@
-import json
 import os
 import re
 import pdfkit
@@ -23,10 +22,11 @@ from Widgets.subject_navigator import SubjectNavigator
 
 from Functions.Appearance import apply_appearance
 from Functions.FileFunctions import FunctionsFile
+from Functions.LessonStore import LESSON_EXT, LessonFileError, now_iso, read_lesson, write_lesson
 from Functions.Plotter import Plotter
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, open_path: str | None = None):
         super().__init__()
         self.ui = Ui_Main_Window()
         self.ui.setupUi(self)
@@ -58,6 +58,17 @@ class MainWindow(QMainWindow):
         self._active_index: int = 0
         self._current_file_path: str | None = None   # set after save/open
 
+        # Unsaved-changes tracking and autosave backup
+        self._dirty: bool = False
+        self._loading: bool = False            # suppress dirty-marking while populating widgets
+        self._created_at: str | None = None    # kept across saves of the same lesson
+        self._autosave_failed: bool = False
+
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setSingleShot(True)
+        self._autosave_timer.setInterval(2000)   # back up 2 s after the last change
+        self._autosave_timer.timeout.connect(self._write_backup)
+
         # Replace placeholder widgets
         self._setup_navigator()
         self._setup_stacked_area()
@@ -68,6 +79,12 @@ class MainWindow(QMainWindow):
         # Connect signals
         self.connect_signals()
         self.ui.LCDDisplay_lesson.display(self._fmt_time(0))
+
+        # Bring back the last session, then open any file we were launched with
+        self._update_title_bar()
+        self._restore_backup()
+        if open_path:
+            QTimer.singleShot(0, lambda: self.open_file_request(open_path))
 
     ## Layout setup
     def _setup_navigator(self) -> None:
@@ -116,6 +133,8 @@ class MainWindow(QMainWindow):
         self.ui.action_HTML.triggered.connect(self.save_as_html)
         self.ui.actionDOCX.triggered.connect(self.export_to_docx)
         self.ui.actionSettings.triggered.connect(self.open_settings)
+
+        self.ui.LELessonName.textChanged.connect(self._mark_dirty)
 
         self._setup_hotkeys()
 
@@ -181,6 +200,19 @@ class MainWindow(QMainWindow):
 
         widget.timer_reset_requested.connect(self._on_subject_timer_reset)
 
+        # Any edit marks the lesson unsaved and schedules a backup.
+        # textChanged also fires on re-highlighting, so only count real edits
+        # (the document's modified flag), then reset the flag for the next one.
+        doc = widget.te_content.document()
+        def on_content_changed(doc=doc):
+            if doc.isModified():
+                doc.setModified(False)
+                self._mark_dirty()
+        widget.te_content.textChanged.connect(on_content_changed)
+        widget.le_title.textChanged.connect(self._mark_dirty)
+        widget.cb_session.currentTextChanged.connect(self._mark_dirty)
+        widget.timer_reset_requested.connect(self._mark_dirty)
+
         return widget
 
     def _add_subject_widget(self, label: str = "") -> SubjectWidget:
@@ -235,6 +267,7 @@ class MainWindow(QMainWindow):
         for widget in self._subject_widgets:
             widget._elapsed_seconds = 0
             widget._update_lcd()
+        self._mark_dirty()
 
     def _on_subject_timer_reset(self, discarded_seconds: int) -> None:
         """Subtract the reset subject's discarded seconds from the lesson timer."""
@@ -245,10 +278,15 @@ class MainWindow(QMainWindow):
         self.timer_time += 1
         self.ui.LCDDisplay_lesson.display(self._fmt_time(self.timer_time))
 
+        # Keep the backup's elapsed times current while timers run
+        if self.timer_time % 30 == 0:
+            self._write_backup()
+
     ## Subject management slots
     def on_new_subject(self) -> None:
         count = len(self._subject_widgets)
         self._add_subject_widget(label=f"Subject {count + 1}")
+        self._mark_dirty()
 
     def _on_navigator_select(self, logical_index: int) -> None:
         if logical_index < 0 or logical_index >= len(self._subject_widgets):
@@ -283,6 +321,7 @@ class MainWindow(QMainWindow):
 
         self._active_index = new_order.index(self._active_index) if self._active_index in new_order else 0
         self.stack.setCurrentWidget(self._subject_widgets[self._active_index])
+        self._mark_dirty()
 
     def _on_subject_deleted(self, logical_index: int) -> None:
         if len(self._subject_widgets) <= 1:
@@ -305,6 +344,7 @@ class MainWindow(QMainWindow):
         # Start the replacement subject's timer if the lesson is running
         if self.timer_running:
             self._subject_widgets[self._active_index].start_timer()
+        self._mark_dirty()
 
     def on_end_lesson(self) -> None:
         reply = QMessageBox.question(
@@ -328,112 +368,150 @@ class MainWindow(QMainWindow):
             "lesson_name": self.ui.LELessonName.text().strip(),
             "lesson_time": self._fmt_time(self.timer_time),
             "lesson_elapsed_seconds": self.timer_time,
+            "created_at": self._created_at,
             "subjects": subjects,
         }
 
     ## Persist / load
-    def save_lesson(self) -> None:
+    def save_lesson(self) -> bool:
         """
-        Save to the current file path if one exists (i.e. previously saved/opened),
-        otherwise fall through to save-as to prompt for a location.
+        Save to the current file if it's a .tap that still exists, otherwise
+        fall through to save-as (e.g. new lessons, opened .json files, or a file
+        that was moved/deleted). Returns True if the lesson was saved.
         """
-        if self._current_file_path:
-            self._write_lesson(self._current_file_path)
-        else:
-            self.save_lesson_as()
+        path = self._current_file_path
+        if path and path.lower().endswith(LESSON_EXT) and os.path.exists(path):
+            return self._write_lesson(path)
+        return self.save_lesson_as()
 
-    def save_lesson_as(self) -> None:
-        """Always prompt for a new file location."""
-        lesson = self._build_lesson_dict()
-        title = lesson["lesson_name"] or "lesson"
+    def save_lesson_as(self) -> bool:
+        """Always prompt for a new file location. Returns True if the lesson was saved."""
+        path = self._current_file_path
+        if path:
+            name   = os.path.splitext(os.path.basename(path))[0]
+            folder = os.path.dirname(path) if os.path.isdir(os.path.dirname(path)) else self._last_folder()
+        else:
+            name   = self.ui.LELessonName.text().strip() or "lesson"
+            folder = self._last_folder()
 
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save Lesson",
-            os.path.join(self.file_func.downloads_path, f"{title}.json"),
-            "JSON Files (*.json)",
+            os.path.join(folder, name + LESSON_EXT),
+            f"TAP Lessons (*{LESSON_EXT})",
         )
         if not file_path:
-            return
-        if not file_path.endswith(".json"):
-            file_path += ".json"
+            return False
+        if not file_path.lower().endswith(LESSON_EXT):
+            file_path += LESSON_EXT
 
-        self._write_lesson(file_path)
+        return self._write_lesson(file_path)
 
-    def _write_lesson(self, path: str) -> None:
+    def _write_lesson(self, path: str) -> bool:
+        self._created_at = self._created_at or now_iso()
         try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(self._build_lesson_dict(), f, indent=4, ensure_ascii=False)
-            self._current_file_path = path
-            self._update_title_bar()
-        except OSError as e:
+            write_lesson(path, self._build_lesson_dict())
+        except LessonFileError as e:
             self.file_func.log(f"Failed to save lesson file '{path}': {e}", level="error")
             QMessageBox.critical(self, "Save Failed", f"Could not save file:\n{e}")
+            return False
+
+        self._current_file_path = path
+        self._remember_folder(path)
+        self._set_dirty(False)
+        self._write_backup()
+        return True
+
+    def _confirm_discard(self, title: str, question: str) -> bool:
+        """If there are unsaved changes, ask Save / Discard / Cancel. Returns False to abort."""
+        if not self._dirty:
+            return True
+
+        reply = QMessageBox.question(
+            self, title, question,
+            QMessageBox.StandardButton.Save |
+            QMessageBox.StandardButton.Discard |
+            QMessageBox.StandardButton.Cancel,
+        )
+        if reply == QMessageBox.StandardButton.Cancel:
+            return False
+        if reply == QMessageBox.StandardButton.Save:
+            return self.save_lesson()
+        return True
 
     def on_action_open(self) -> None:
-        # Prompt for a .json lesson file, offer to save current work first.
-        has_content = len(self._subject_widgets) > 1 or bool(
-            self._subject_widgets and self._subject_widgets[0].le_title.text()
-        )
-        if has_content:
-            reply = QMessageBox.question(
-                self, "Open Lesson",
-                "Save current lesson before opening another?",
-                QMessageBox.StandardButton.Save |
-                QMessageBox.StandardButton.Discard |
-                QMessageBox.StandardButton.Cancel,
-            )
-            if reply == QMessageBox.StandardButton.Cancel:
-                return
-            if reply == QMessageBox.StandardButton.Save:
-                self.save_lesson()
+        # Prompt for a lesson file, offer to save current work first.
+        if not self._confirm_discard("Open Lesson", "Save current lesson before opening another?"):
+            return
 
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Open Lesson",
-            self.file_func.downloads_path,
-            "JSON Files (*.json)",
+            self._last_folder(),
+            f"Lessons (*{LESSON_EXT} *.json);;TAP Lessons (*{LESSON_EXT});;JSON Lessons (*.json)",
         )
         if not file_path:
             return
 
         self.load_from_file(file_path)
 
+    def open_file_request(self, path: str) -> None:
+        """Open a lesson passed in from outside (command line / another launch)."""
+        name = os.path.basename(path)
+        if self._confirm_discard("Open Lesson", f'Save current lesson before opening "{name}"?'):
+            self.load_from_file(path)
+
+    def handle_external_open(self, path: str) -> None:
+        """Slot for a second TAP launch: come to the front, then open its file (if any)."""
+        if self.isMinimized():
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        if path:
+            self.open_file_request(path)
+
     def load_from_file(self, path: str) -> None:
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError) as e:
+            data, _ = read_lesson(path)
+        except LessonFileError as e:
             QMessageBox.critical(self, "Load Error", str(e))
             self.file_func.log(f"Failed to load lesson file '{path}': {e}", level="error")
             return
 
-        self._clear_all(skip_default=True)
-
-        self.ui.LELessonName.setText(data.get("lesson_name", ""))
-        self.timer_time = int(data.get("lesson_elapsed_seconds", 0))
-        self.ui.LCDDisplay_lesson.display(self._fmt_time(self.timer_time))
-
-        for i, subj_data in enumerate(data.get("subjects", [])):
-            widget = self._add_subject_widget(
-                label=subj_data.get("title") or f"Subject {i + 1}",
-            )
-            widget.from_dict(subj_data)
-
+        self._populate(data)
         self._current_file_path = path
-        self._update_title_bar()
+        self._remember_folder(path)
+        self._set_dirty(False)
+        self._write_backup()
+
+    def _populate(self, data: dict) -> None:
+        """Replace the current lesson with data. Timers come back paused."""
+        self._loading = True
+        try:
+            self._clear_all(skip_default=True)
+
+            self.ui.LELessonName.setText(data.get("lesson_name", ""))
+            self.timer_time = int(data.get("lesson_elapsed_seconds", 0))
+            self.ui.LCDDisplay_lesson.display(self._fmt_time(self.timer_time))
+
+            for i, subj_data in enumerate(data.get("subjects") or [{}]):
+                widget = self._add_subject_widget(
+                    label=subj_data.get("title") or f"Subject {i + 1}",
+                )
+                widget.from_dict(subj_data)
+
+            self._created_at = data.get("created_at")
+        finally:
+            self._loading = False
 
     def _update_title_bar(self) -> None:
-        # Show the open filename in the window title.
+        # Show the open filename in the window title, with • for unsaved changes.
         if self._current_file_path:
-            name = os.path.basename(self._current_file_path)
-            self.setWindowTitle(f"{name} — Lesson Notes")
+            title = f"{os.path.basename(self._current_file_path)} — Lesson Notes"
         else:
-            self.setWindowTitle("Lesson Notes")
+            title = "Lesson Notes"
+        self.setWindowTitle(f"• {title}" if self._dirty else title)
 
     def on_action_new(self) -> None:
-        has_content = len(self._subject_widgets) > 1 or bool(
-            self._subject_widgets and self._subject_widgets[0].le_title.text()
-        )
-        if has_content:
+        if self._dirty:
             reply = QMessageBox.question(
                 self, "New Lesson", "Discard current lesson and start fresh?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
@@ -441,6 +519,7 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 return
         self._clear_all()
+        self._write_backup()
 
     def _clear_all(self, skip_default: bool = False) -> None:
         self.timer_stop()
@@ -456,10 +535,76 @@ class MainWindow(QMainWindow):
         self.navigator.clear()
         self._active_index = 0
         self._current_file_path = None
+        self._created_at = None
+        self._dirty = False
         self._update_title_bar()
 
         if not skip_default:
             self._add_subject_widget(label="Subject 1")
+
+    ## Unsaved changes / autosave backup
+    def _mark_dirty(self, *_) -> None:
+        if self._loading:
+            return
+        if not self._dirty:
+            self._set_dirty(True)
+        self._autosave_timer.start()   # restarts the 2 s countdown on every change
+
+    def _set_dirty(self, dirty: bool) -> None:
+        self._dirty = dirty
+        self._update_title_bar()
+
+    def _write_backup(self) -> None:
+        """Snapshot the current lesson to appdata so it survives a crash or close."""
+        self._autosave_timer.stop()
+        self._created_at = self._created_at or now_iso()
+        meta = {
+            "source_path": self._current_file_path or "",
+            "dirty":       int(self._dirty),
+        }
+        try:
+            write_lesson(self.file_func.backup_path, self._build_lesson_dict(), meta)
+        except LessonFileError as e:
+            self.file_func.log(f"Autosave failed: {e}", level="error")
+            if not self._autosave_failed:
+                self._autosave_failed = True
+                self.statusBar().showMessage("Autosave failed — see log")
+            return
+
+        if self._autosave_failed:
+            self._autosave_failed = False
+            self.statusBar().clearMessage()
+
+    def _restore_backup(self) -> None:
+        """Reopen the last session from the appdata backup, if there is one."""
+        path = self.file_func.backup_path
+        if not os.path.exists(path):
+            return
+        try:
+            data, meta = read_lesson(path)
+        except LessonFileError as e:
+            self.file_func.log(f"Could not restore last session: {e}", level="warning")
+            return
+
+        self._populate(data)
+        self._current_file_path = meta.get("source_path") or None
+        self._set_dirty(meta.get("dirty") == "1")
+
+    def closeEvent(self, event) -> None:
+        # No "save changes?" prompt — the backup brings this session back next launch
+        self._write_backup()
+        super().closeEvent(event)
+
+    ## Last-used folder
+    def _last_folder(self) -> str:
+        folder = self.configs.get("last_folder", "")
+        return folder if folder and os.path.isdir(folder) else self.file_func.downloads_path
+
+    def _remember_folder(self, path: str) -> None:
+        folder = os.path.dirname(os.path.abspath(path))
+        if folder != self.configs.get("last_folder"):
+            self.configs["last_folder"] = folder
+            self.file_func.save_configs({"last_folder": folder})
 
     ## Bracket auto-pairing
     def _on_text_changed(self, widget: SubjectWidget) -> None:

@@ -6,6 +6,8 @@ build_options = {
         "PySide6.QtCore",
         "PySide6.QtGui", 
         "PySide6.QtWidgets",
+        "PySide6.QtNetwork", # QLocalServer/QLocalSocket keep TAP to a single instance
+        "sqlite3", # .tap lesson files are SQLite databases
         "seaborn",
         "matplotlib",
         "platformdirs",

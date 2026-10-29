@@ -6,8 +6,8 @@
 #define MyAppPublisher "Alex Kussauer"
 #define MyAppURL "https://www.linkedin.com/in/alex-kussauer-771b782ab/"
 #define MyAppExeName "TAP.exe"
-#define MyAppAssocName MyAppName + " File"
-#define MyAppAssocExt ".myp"
+#define MyAppAssocName MyAppName + " Lesson"
+#define MyAppAssocExt ".tap"
 #define MyAppAssocKey StringChange(MyAppAssocName, " ", "") + MyAppAssocExt
 
 [Setup]
@@ -53,6 +53,8 @@ Source: "B:\Projects\Programs\TAP\build\exe.win-amd64-3.12\*"; DestDir: "{app}";
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Registry]
+; Make TAP the default program for .tap files (double-click opens the lesson)
+Root: HKA; Subkey: "Software\Classes\{#MyAppAssocExt}"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}"; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocExt}\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKey}"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocName}"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKey}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"

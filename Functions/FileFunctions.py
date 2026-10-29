@@ -28,6 +28,7 @@ DEFAULT_CONFIG = {
     },
     "Language": "en_GB",
     "tab_size": 4,
+    "last_folder": "",   # where Save As / Open start; empty = Downloads
     "Hotkeys": {
         "new_subject":   "Ctrl+N",
         "lesson_timer":  "Ctrl+T",
@@ -43,6 +44,7 @@ class FunctionsFile:
 
         self.app_data_path = self.create_appdata_repo()
         self.downloads_path = os.path.join(Path.home(), "Downloads")
+        self.backup_path = os.path.join(self.app_data_path, "autosave.tap")   # last session, restored on launch
 
         self.initialize_all_paths()
         self.setup_logging()
