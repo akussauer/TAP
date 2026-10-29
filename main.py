@@ -1,7 +1,6 @@
 # Package imports
 import sys
 import os
-import platform
 from platformdirs import user_data_dir
 from pathlib import Path
 import json
@@ -10,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 # Import 1st page
 from Pages.Helpers.Main_Window import MainWindow
+from Functions.Appearance import apply_appearance
 
 def load_config():
     # Get the app data path
@@ -29,36 +29,11 @@ def load_config():
         return None
 
 if __name__ == "__main__":
-    config = load_config()
+    app = QApplication(sys.argv)
 
-    if config is not None:
-        # System Theme
-        if platform.system() == "Windows":
-            theme = config["theme"].lower()
-            if theme == 'dark':
-                sys.argv += ['-platform', 'windows:darkmode=2']
-            elif theme == 'light':
-                sys.argv += ['-platform', 'windows:darkmode=1']
-            elif theme == 'system':
-                sys.argv += ['-platform', 'windows:darkmode=0']
-            else:
-                sys.argv += ['-platform', 'windows:darkmode=2'] # Default to dark mode if invalid value
+    # System theme and style (defaults to system theme / system style without a config)
+    apply_appearance(app, load_config() or {})
 
-        app = QApplication(sys.argv)
-
-        # System Style
-        if config["style"].lower() != "default":
-            # Set the style to the user's preference
-            app.setStyle(config["style"])
-        else:
-            # Use system default
-            system = system_style = app.style().objectName()
-            app.setStyle(system_style)
-    else:
-        app = QApplication(sys.argv)
-        sys.argv += ['-platform', 'windows:darkmode=0'] # Default to system theme
-        system = system_style = app.style().objectName() # Default to system style
-        app.setStyle(system_style)
     # Set application metadata
     app.setApplicationName("TAP")
     app.setOrganizationName("Maple Studios")

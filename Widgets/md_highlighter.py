@@ -38,11 +38,32 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self.parent = parent
         self.file_func = file_func
         self.rules = []
+        self.spell = None
+        self._language = None
 
+        # Spell check format — red underline
+        self.spell_error_fmt = QTextCharFormat()
+        self.spell_error_fmt.setUnderlineColor(QColor("#E06C6C"))
+        self.spell_error_fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SpellCheckUnderline)
+
+        self._load_spellcheck(language)
+        self._build_rules()
+
+    def reload_config(self) -> None:
+        """Re-read spell-check language and colours from config and repaint the document."""
+        self._load_spellcheck(self._language)
+        self._build_rules()
+        self.rehighlight()
+
+    def _load_spellcheck(self, language) -> None:
         if self.file_func:
             config = self.file_func.get_configs()
             if config and "Language" in config:
                 language = config["Language"]
+
+        if language == self._language:
+            return   # unchanged — avoid repeating the missing-dictionary warning
+        self._language = language
 
         # Spell checker
         try:
@@ -52,18 +73,6 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             if self.file_func:
                 self.file_func.log(f"No dictionary found for language '{language}'. Spell checking disabled.", level="warning")
             QMessageBox.warning(self.parent, "Spell Check Warning", f"No dictionary found for language '{language}'. Spell checking will be disabled.")
-
-        # Spell check format — red underline
-        self.spell_error_fmt = QTextCharFormat()
-        self.spell_error_fmt.setUnderlineColor(QColor("#E06C6C"))
-        self.spell_error_fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SpellCheckUnderline)
-
-        self._build_rules()
-
-    def reload_colours(self) -> None:
-        """Re-read colours from config and repaint the document."""
-        self._build_rules()
-        self.rehighlight()
 
     def _build_rules(self) -> None:
         colours = self.file_func.get_configs().get("markdown_colours", {}) if self.file_func else {}

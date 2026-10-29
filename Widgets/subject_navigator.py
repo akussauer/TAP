@@ -27,20 +27,43 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+_LIST_STYLE = """
+    QListWidget {
+        background: palette(base);
+        border: 1px solid palette(mid);
+        outline: none;
+    }
+    QListWidget::item {
+        color: palette(text);
+        background: palette(base);
+        padding: 4px 6px;
+        border-radius: 3px;
+    }
+    QListWidget::item:selected {
+        background: palette(highlight);
+        color: palette(highlighted-text);
+        outline: none;
+    }
+    QListWidget::item:focus {
+        outline: none;
+        border: none;
+    }
+"""
+
 
 class SubjectNavigator(QWidget):
     # Emitted when the user clicks a different subject row
-    subject_selected = Signal(int)          # logical subject index
+    subject_selected = Signal(int)  # logical subject index
     # Emitted after drag-drop; payload is the new logical order
     # e.g. [2, 0, 1] means "what was index 2 is now first" etc.
     order_changed = Signal(list)
     # Emitted when the user deletes a subject via the context menu
-    subject_deleted = Signal(int)           # logical subject index
+    subject_deleted = Signal(int)  # logical subject index
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._building = False          # guard against recursive drop signals
-        self._active_index: int = 0     # which logical index is "live"
+        self._building = False  # guard against recursive drop signals
+        self._active_index: int = 0  # which logical index is "live"
 
         self.setMaximumWidth(200)
         self._build_ui()
@@ -65,31 +88,12 @@ class SubjectNavigator(QWidget):
         self.list_widget = QListWidget(self)
         self.list_widget.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.list_widget.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self.list_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.list_widget.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
         self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list_widget.setSpacing(1)
-        self.list_widget.setStyleSheet("""
-            QListWidget {
-                background: palette(base);
-                border: 1px solid palette(mid);
-                outline: none;
-            }
-            QListWidget::item {
-                color: palette(text);
-                background: palette(base);
-                padding: 4px 6px;
-                border-radius: 3px;
-            }
-            QListWidget::item:selected {
-                background: palette(highlight);
-                color: palette(highlighted-text);
-                outline: none;
-            }
-            QListWidget::item:focus {
-                outline: none;
-                border: none;
-            }
-        """)
+        self.refresh_style()
 
         # Signals
         self.list_widget.currentRowChanged.connect(self._on_row_changed)
@@ -102,6 +106,12 @@ class SubjectNavigator(QWidget):
     # ──────────────────────────────────────────────────────────────────
     # Public API
     # ──────────────────────────────────────────────────────────────────
+
+    def refresh_style(self) -> None:
+        """(Re)apply the list stylesheet. palette() values are resolved when the
+        sheet is set, so this must be called again after a theme change."""
+        self.list_widget.setStyleSheet("")
+        self.list_widget.setStyleSheet(_LIST_STYLE)
 
     def add_subject(self, title: str, is_active: bool = True) -> None:
         """Append a new entry. Pass is_active=True for the live subject."""
@@ -234,7 +244,7 @@ class SubjectNavigator(QWidget):
         logical = item.data(Qt.ItemDataRole.UserRole)
 
         menu = QMenu(self)
-        delete_action = menu.addAction("🗑  Delete subject")
+        delete_action = menu.addAction("Delete")
         action = menu.exec(self.list_widget.mapToGlobal(pos))
 
         if action == delete_action:

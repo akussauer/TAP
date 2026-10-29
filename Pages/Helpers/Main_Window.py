@@ -10,7 +10,7 @@ from docx.shared import Inches
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QFileDialog, QMainWindow, QMessageBox, QStackedWidget,
+    QApplication, QFileDialog, QMainWindow, QMessageBox, QStackedWidget,
     QWidget
     )
 
@@ -21,6 +21,7 @@ from Widgets.md_highlighter import MarkdownHighlighter
 from Widgets.subject_widget import SubjectWidget
 from Widgets.subject_navigator import SubjectNavigator
 
+from Functions.Appearance import apply_appearance
 from Functions.FileFunctions import FunctionsFile
 from Functions.Plotter import Plotter
 
@@ -143,6 +144,11 @@ class MainWindow(QMainWindow):
             "save":          self.save_lesson,
             "open":          self.on_action_open,
         }
+
+        # Drop any shortcuts from a previous call (settings re-applied at runtime)
+        for sc in getattr(self, "_shortcuts", []):
+            sc.setEnabled(False)
+            sc.setParent(None)
 
         self._shortcuts: list[QShortcut] = []   # keep references alive
         for key, slot in actions.items():
@@ -684,11 +690,20 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         dialog = SettingsDialog(self, file_func=self.file_func)
         if dialog.exec():
-            # Apply new markdown colours and tab size to already-open subjects
-            tab_size = self.file_func.get_configs().get("tab_size", 4)
-            for widget in self._subject_widgets:
-                widget.highlighter.reload_colours()
-                widget.te_content.set_tab_size(tab_size)
+            self._apply_settings()
+
+    def _apply_settings(self) -> None:
+        """Re-apply the saved config to the running app — no relaunch needed."""
+        self.configs = self.file_func.get_configs()
+
+        apply_appearance(QApplication.instance(), self.configs)
+        self.navigator.refresh_style()
+        self._setup_hotkeys()
+
+        tab_size = self.configs.get("tab_size", 4)
+        for widget in self._subject_widgets:
+            widget.highlighter.reload_config()
+            widget.te_content.set_tab_size(tab_size)
 
     ## DOCX export
     def export_to_docx(self) -> None:
