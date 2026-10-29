@@ -8,11 +8,26 @@ from PySide6.QtWidgets import QMessageBox
 from platformdirs import user_data_dir
 from pathlib import Path
 
+_DEFAULT_MARKDOWN_COLOUR = "#0E80A3"
+
 DEFAULT_CONFIG = {
     "theme": "system",
     "style": "default",
-    "markdown_colour": "#0E80A3",
+    "markdown_colours": {
+        "heading":         _DEFAULT_MARKDOWN_COLOUR,
+        "bold":            _DEFAULT_MARKDOWN_COLOUR,
+        "italic":          _DEFAULT_MARKDOWN_COLOUR,
+        "strikethrough":   _DEFAULT_MARKDOWN_COLOUR,
+        "list":            _DEFAULT_MARKDOWN_COLOUR,
+        "checkbox":        _DEFAULT_MARKDOWN_COLOUR,
+        "code":            _DEFAULT_MARKDOWN_COLOUR,
+        "blockquote":      _DEFAULT_MARKDOWN_COLOUR,
+        "line_break":      _DEFAULT_MARKDOWN_COLOUR,
+        "link":            _DEFAULT_MARKDOWN_COLOUR,
+        "horizontal_rule": _DEFAULT_MARKDOWN_COLOUR,
+    },
     "Language": "en_GB",
+    "tab_size": 4,
     "Hotkeys": {
         "new_subject":   "Ctrl+N",
         "lesson_timer":  "Ctrl+T",
@@ -125,6 +140,13 @@ class FunctionsFile:
         merged = {**DEFAULT_CONFIG, **data}
         # Deep-merge Hotkeys so individual missing hotkeys also fall back
         merged["Hotkeys"] = {**DEFAULT_CONFIG["Hotkeys"], **data.get("Hotkeys", {})}
+
+        # Deep-merge markdown colours; older configs stored a single "markdown_colour"
+        legacy = merged.pop("markdown_colour", None)
+        base_colours = DEFAULT_CONFIG["markdown_colours"]
+        if legacy:
+            base_colours = {k: legacy for k in base_colours}
+        merged["markdown_colours"] = {**base_colours, **data.get("markdown_colours", {})}
         return merged
 
     def save_configs(self, settings: dict) -> None:
@@ -135,11 +157,13 @@ class FunctionsFile:
         current = self.get_configs()
 
         # Top-level merge
-        current.update({k: v for k, v in settings.items() if k != "Hotkeys"})
+        nested = ("Hotkeys", "markdown_colours")
+        current.update({k: v for k, v in settings.items() if k not in nested})
 
-        # Deep-merge Hotkeys
-        if "Hotkeys" in settings:
-            current["Hotkeys"] = {**current.get("Hotkeys", {}), **settings["Hotkeys"]}
+        # Deep-merge nested sections
+        for key in nested:
+            if key in settings:
+                current[key] = {**current.get(key, {}), **settings[key]}
 
         try:
             self._write_config(current)

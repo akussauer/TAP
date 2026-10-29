@@ -2,8 +2,10 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QComboBox, QGridLayout, QLabel, QLCDNumber, QLineEdit,
-    QPushButton, QSizePolicy, QTextEdit, QWidget,
+    QPushButton, QSizePolicy, QWidget,
     )
+
+from Widgets.md_text_edit import MarkdownTextEdit
 
 class SubjectWidget(QWidget):
     # Emitted when the subject timer is reset; carries the seconds that were discarded
@@ -122,7 +124,7 @@ class SubjectWidget(QWidget):
         root.addWidget(top, 0, 0, 1, 1)
 
         # Notes text-edit
-        self.te_content = QTextEdit(self)
+        self.te_content = MarkdownTextEdit(self)
         font_te = QFont()
         font_te.setPointSize(12)
         self.te_content.setFont(font_te)

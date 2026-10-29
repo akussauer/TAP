@@ -155,12 +155,14 @@ class MainWindow(QMainWindow):
     def _make_subject_widget(self) -> SubjectWidget:
         widget = SubjectWidget(parent=self)
 
-        MarkdownHighlighter(
+        widget.highlighter = MarkdownHighlighter(
             widget.te_content.document(),
             parent=self,
             file_func=self.file_func,
             language=self.configs.get("Language", "english").lower(),
         )
+
+        widget.te_content.set_tab_size(self.configs.get("tab_size", 4))
 
         widget.te_content.textChanged.connect(
             lambda w=widget: self._on_text_changed(w)
@@ -461,7 +463,8 @@ class MainWindow(QMainWindow):
         text = te.toPlainText()
         current_length = len(text)
 
-        if current_length <= te._last_text_length:
+        # List continuation / indenting edits aren't typed characters — don't auto-pair
+        if current_length <= te._last_text_length or te.structural_edit:
             te._last_text_length = current_length
             return
         te._last_text_length = current_length
@@ -680,7 +683,12 @@ class MainWindow(QMainWindow):
     ## Settings dialog
     def open_settings(self):
         dialog = SettingsDialog(self, file_func=self.file_func)
-        dialog.exec()
+        if dialog.exec():
+            # Apply new markdown colours and tab size to already-open subjects
+            tab_size = self.file_func.get_configs().get("tab_size", 4)
+            for widget in self._subject_widgets:
+                widget.highlighter.reload_colours()
+                widget.te_content.set_tab_size(tab_size)
 
     ## DOCX export
     def export_to_docx(self) -> None:

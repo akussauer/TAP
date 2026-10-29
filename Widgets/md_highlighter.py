@@ -4,6 +4,34 @@ import enchant
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 
+_DEFAULT_COLOUR = "#0E80A3"
+
+# (colour key in config["markdown_colours"], pattern, bold, italic) — later rules paint over earlier ones
+_RULES = [
+    # --- Headings (# ## ###)
+    ("heading",         r'^#{1,6} .+',                                 True,  False),
+    # --- Italic (*text*) — single asterisks only, so bold isn't overridden
+    ("italic",          r'(?<!\*)\*(?![\s*]).*?(?<![\s*])\*(?!\*)',    False, True),
+    # --- Bold (**text**)
+    ("bold",            r'\*\*.+?\*\*',                                True,  False),
+    # --- Strikethrough (~~text~~)
+    ("strikethrough",   r'~~.+?~~',                                    False, False),
+    # --- Ordered (1. 2.) and unordered (- * +) list markers, indented or not
+    ("list",            r'^\s*(?:[-*+]|\d+[.)])(?= )',                 False, False),
+    # --- Checkboxes (- [ ] or - [x])
+    ("checkbox",        r'^\s*[-*+] \[[ xX]\] ',                       False, False),
+    # --- Inline code (`code`)
+    ("code",            r'`.+?`',                                      False, False),
+    # --- Block quote (>)
+    ("blockquote",      r'^> .+',                                      False, False),
+    # --- Breaking line (<br>)
+    ("line_break",      r'<br\s*/?>',                                  False, False),
+    # --- Links ([text](url))
+    ("link",            r'\[.+?\]\(.+?\)',                             False, False),
+    # --- Horizontal rule (--- or ***)
+    ("horizontal_rule", r'^(\-{3,}|\*{3,})',                           False, False),
+]
+
 class MarkdownHighlighter(QSyntaxHighlighter):
     def __init__(self, document, parent=None, file_func=None, language="en_GB"):
         super().__init__(document)
@@ -15,60 +43,33 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             config = self.file_func.get_configs()
             if config and "Language" in config:
                 language = config["Language"]
-                colour = config["markdown_colour"]
-            else:
-                colour ="#0E80A3"
-        else:
-            colour = "#0E80A3"
 
         # Spell checker
         try:
             self.spell = enchant.Dict(language) # Use the specified language dictionary
         except enchant.errors.DictNotFoundError:
             self.spell = None
-            self.file_func.log(f"No dictionary found for language '{language}'. Spell checking disabled.", level="warning")
-            QMessageBox.Warning(self.parent, "Spell Check Warning", f"No dictionary found for language '{language}'. Spell checking will be disabled.")
+            if self.file_func:
+                self.file_func.log(f"No dictionary found for language '{language}'. Spell checking disabled.", level="warning")
+            QMessageBox.warning(self.parent, "Spell Check Warning", f"No dictionary found for language '{language}'. Spell checking will be disabled.")
 
         # Spell check format — red underline
         self.spell_error_fmt = QTextCharFormat()
         self.spell_error_fmt.setUnderlineColor(QColor("#E06C6C"))
         self.spell_error_fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SpellCheckUnderline)
 
-        # --- Headings (# ## ###) — orange/gold
-        self._add_rule(r'^#{1,6} .+', colour, bold=True)
+        self._build_rules()
 
-        # --- Bold (**text**) — white/bright
-        self._add_rule(r'\*\*.+?\*\*', colour, bold=True)
+    def reload_colours(self) -> None:
+        """Re-read colours from config and repaint the document."""
+        self._build_rules()
+        self.rehighlight()
 
-        # --- Italic (*text*) — light grey
-        self._add_rule(r'\*.+?\*', colour, italic=True)
-
-        # --- Strikethrough (~~text~~) — muted red
-        self._add_rule(r'~~.+?~~', colour)
-
-        # --- Ordered list (1. 2. etc) — light blue
-        self._add_rule(r'^\d+\.', colour)
-
-        # --- Unordered list (- or *) — light blue
-        self._add_rule(r'^[\-\*] ', colour)
-
-        # --- Inline code (`code`) — green
-        self._add_rule(r'`.+?`', colour)
-
-        # --- Block quote (>) — muted purple
-        self._add_rule(r'^> .+', colour)
-
-        # --- Breaking line (<br>) — muted red
-        self._add_rule(r'<br\s*/?>', colour)
-
-        # --- Checkboxes (- [ ] or - [x]) — light blue
-        self._add_rule(r'^- \[[ xX]\] ', colour)
-
-        # --- Links ([text](url)) — blue
-        self._add_rule(r'\[.+?\]\(.+?\)', colour)
-
-        # --- Horizontal rule (--- or ***) — muted red
-        self._add_rule(r'^(\-{3,}|\*{3,})', colour)
+    def _build_rules(self) -> None:
+        colours = self.file_func.get_configs().get("markdown_colours", {}) if self.file_func else {}
+        self.rules = []
+        for key, pattern, bold, italic in _RULES:
+            self._add_rule(pattern, colours.get(key, _DEFAULT_COLOUR), bold=bold, italic=italic)
 
     def _add_rule(self, pattern, color, bold=False, italic=False):
         fmt = QTextCharFormat()
